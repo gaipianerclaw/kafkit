@@ -1,0 +1,66 @@
+use std::sync::Arc;
+use tauri::Manager;
+
+mod commands;
+mod models;
+mod services;
+mod store;
+
+use commands::*;
+use services::{ConnectionManager, ConsumerService};
+use store::ConfigStore;
+use tokio::sync::Mutex;
+
+pub struct AppState {
+    pub connection_manager: Arc<ConnectionManager>,
+    pub consumer_service: Arc<ConsumerService>,
+    pub config_store: Arc<Mutex<ConfigStore>>,
+}
+
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            
+            let config_store = Arc::new(Mutex::new(ConfigStore::new(app_handle.clone())));
+            let connection_manager = Arc::new(ConnectionManager::new());
+            let consumer_service = Arc::new(ConsumerService::new(connection_manager.clone()));
+            
+            app.manage(AppState {
+                connection_manager,
+                consumer_service,
+                config_store,
+            });
+            
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            // Connection
+            get_connections,
+            get_connection,
+            test_connection,
+            create_connection,
+            update_connection,
+            delete_connection,
+            // Topic
+            list_topics,
+            get_topic_detail,
+            create_topic,
+            delete_topic,
+            // Consumer
+            start_consuming,
+            stop_consuming,
+            fetch_messages,
+            // Producer
+            produce_message,
+            produce_batch,
+            // Consumer Group
+            list_consumer_groups,
+            get_consumer_lag,
+            reset_consumer_offset,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
