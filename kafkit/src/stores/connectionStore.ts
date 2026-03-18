@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import type { Connection, ConnectionConfig, ConnectionSummary, ConnectionTestResult } from '../types';
-import * as tauriService from '../services/tauriService';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务（避免在浏览器环境中加载 Tauri API）
+const getService = async () => {
+  if (isTauri()) {
+    return import('../services/tauriService');
+  } else {
+    return import('../services/mockTauriService');
+  }
+};
 
 interface ConnectionState {
   connections: ConnectionSummary[];
@@ -27,9 +40,11 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   fetchConnections: async () => {
     set({ isLoading: true, error: null });
     try {
+      const tauriService = await getService();
       const connections = await tauriService.getConnections();
       set({ connections, isLoading: false });
     } catch (error) {
+      console.error('[Kafkit] Failed to fetch connections:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch connections',
         isLoading: false 
@@ -44,6 +59,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   createConnection: async (config) => {
     set({ isLoading: true, error: null });
     try {
+      const tauriService = await getService();
       const connection = await tauriService.createConnection(config);
       await get().fetchConnections();
       set({ isLoading: false });
@@ -60,6 +76,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   updateConnection: async (id, config) => {
     set({ isLoading: true, error: null });
     try {
+      const tauriService = await getService();
       const connection = await tauriService.updateConnection(id, config);
       await get().fetchConnections();
       set({ isLoading: false });
@@ -76,6 +93,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   deleteConnection: async (id) => {
     set({ isLoading: true, error: null });
     try {
+      const tauriService = await getService();
       await tauriService.deleteConnection(id);
       if (get().activeConnection === id) {
         set({ activeConnection: null });
@@ -93,6 +111,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   testConnection: async (config) => {
     try {
+      const tauriService = await getService();
       return await tauriService.testConnection(config);
     } catch (error) {
       throw error;

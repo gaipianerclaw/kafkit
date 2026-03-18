@@ -5,7 +5,20 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
-import * as tauriService from '../../services/tauriService';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务
+const getService = async () => {
+  if (isTauri()) {
+    return import('../../services/tauriService');
+  } else {
+    return import('../../services/mockTauriService');
+  }
+};
 
 export function ProducerPage() {
   const navigate = useNavigate();
@@ -30,6 +43,7 @@ export function ProducerPage() {
     setResult(null);
 
     try {
+      const tauriService = await getService();
       if (mode === 'single') {
         await tauriService.produceMessage(activeConnection, decodedTopic, {
           partition: partition ? parseInt(partition) : undefined,

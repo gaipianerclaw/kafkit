@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.1] - 2026-03-18
+
+### 🐛 Bug 修复
+
+- **修复桌面端空白页面问题**
+  - 问题原因：前端代码直接静态导入 Tauri API，在 Tauri 环境加载失败时导致应用崩溃
+  - 解决方案：为所有调用 Tauri 的文件添加环境检测和动态导入机制
+    - `stores/connectionStore.ts`
+    - `pages/Topics/TopicListPage.tsx`
+    - `pages/Topics/TopicDetailPage.tsx`
+    - `pages/Producer/ProducerPage.tsx`
+    - `pages/Groups/GroupListPage.tsx`
+    - `pages/Consumer/ConsumerPage.tsx`
+  - 应用现在能根据环境自动切换真实服务或 Mock 服务
+
+---
+
 ## [1.0.0] - 2026-03-13
 
 ### 🎉 初始版本发布

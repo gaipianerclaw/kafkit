@@ -3,8 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
-import * as tauriService from '../../services/tauriService';
 import type { ConsumerGroupInfo, PartitionLag } from '../../types';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务
+const getService = async () => {
+  if (isTauri()) {
+    return import('../../services/tauriService');
+  } else {
+    return import('../../services/mockTauriService');
+  }
+};
 
 export function GroupListPage() {
   const navigate = useNavigate();
@@ -33,6 +46,7 @@ export function GroupListPage() {
     
     setLoading(true);
     try {
+      const tauriService = await getService();
       const data = await tauriService.listConsumerGroups(activeConnection);
       setGroups(data);
     } catch (err) {
@@ -47,6 +61,7 @@ export function GroupListPage() {
     
     setLagLoading(true);
     try {
+      const tauriService = await getService();
       const data = await tauriService.getConsumerLag(activeConnection, groupId);
       setLagData(data);
     } catch (err) {

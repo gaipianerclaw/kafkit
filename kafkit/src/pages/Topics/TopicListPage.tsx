@@ -4,8 +4,21 @@ import { RefreshCw, Search, Plus, Trash2, Eye, Send, Download } from 'lucide-rea
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useConnectionStore } from '../../stores';
-import * as tauriService from '../../services/tauriService';
 import type { TopicInfo } from '../../types';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务
+const getService = async () => {
+  if (isTauri()) {
+    return import('../../services/tauriService');
+  } else {
+    return import('../../services/mockTauriService');
+  }
+};
 
 export function TopicListPage() {
   const navigate = useNavigate();
@@ -39,6 +52,7 @@ export function TopicListPage() {
     setLoading(true);
     setError(null);
     try {
+      const tauriService = await getService();
       const data = await tauriService.listTopics(activeConnection);
       setTopics(data);
       setFilteredTopics(data);
@@ -54,6 +68,7 @@ export function TopicListPage() {
     if (!confirm(`确定要删除 Topic "${topicName}" 吗？此操作不可恢复！`)) return;
 
     try {
+      const tauriService = await getService();
       await tauriService.deleteTopic(activeConnection, topicName);
       await fetchTopics();
     } catch (err) {

@@ -3,8 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Send, Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
-import * as tauriService from '../../services/tauriService';
 import type { TopicDetail } from '../../types';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务
+const getService = async () => {
+  if (isTauri()) {
+    return import('../../services/tauriService');
+  } else {
+    return import('../../services/mockTauriService');
+  }
+};
 
 export function TopicDetailPage() {
   const navigate = useNavigate();
@@ -27,6 +40,7 @@ export function TopicDetailPage() {
     setLoading(true);
     setError(null);
     try {
+      const tauriService = await getService();
       const data = await tauriService.getTopicDetail(activeConnection, decodeURIComponent(topic));
       setDetail(data);
     } catch (err) {

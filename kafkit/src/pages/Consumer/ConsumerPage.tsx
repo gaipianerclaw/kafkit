@@ -4,9 +4,29 @@ import { ArrowLeft, Play, Pause, Trash2, Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
-import * as tauriService from '../../services/tauriService';
 import type { KafkaMessage, TopicDetail } from '../../types';
-import { listen } from '@tauri-apps/api/event';
+
+// 检测是否在 Tauri 环境中
+const isTauri = () => {
+  return typeof window !== 'undefined' && !!(window as any).__TAURI__;
+};
+
+// 动态导入服务
+const getService = async () => {
+  if (isTauri()) {
+    return import('../../services/tauriService');
+  } else {
+    return import('../../services/mockTauriService');
+  }
+};
+
+// 动态导入 Tauri event API
+const getTauriEvent = async () => {
+  if (isTauri()) {
+    return import('@tauri-apps/api/event');
+  }
+  return null;
+};
 
 export function ConsumerPage() {
   const navigate = useNavigate();
@@ -42,6 +62,7 @@ export function ConsumerPage() {
   const fetchTopicDetail = async () => {
     if (!activeConnection || !topic) return;
     try {
+      const tauriService = await getService();
       const data = await tauriService.getTopicDetail(activeConnection, decodedTopic);
       setDetail(data);
     } catch (err) {
@@ -53,6 +74,7 @@ export function ConsumerPage() {
     if (!activeConnection || !topic) return;
 
     try {
+      const tauriService = await getService();
       const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
       const sid = await tauriService.startConsuming(
         activeConnection,
@@ -63,11 +85,24 @@ export function ConsumerPage() {
       setSessionId(sid);
       setIsConsuming(true);
 
-      // Listen for messages
-      const unlisten = await listen<KafkaMessage>('kafka-message', (event) => {
-        setMessages(prev => [...prev, event.payload]);
-      });
-      unlistenRef.current = unlisten;
+      // Listen for messages (only in Tauri)
+      const tauriEvent = await getTauriEvent();
+      if (tauriEvent) {
+        const unlisten = await tauriEvent.listen<KafkaMessage>('kafka-message', (event) => {
+          setMessages(prev => [...prev, event.payload]);
+        });
+        unlistenRef.current = unlisten;
+      } else {
+        // Mock mode: simulate message arrival
+        const interval = setInterval(async () => {
+          const mockService = await getService();
+          const result = await mockService.fetchMessages(activeConnection, decodedTopic, 0, 0, 1);
+          if (result.messages.length > 0) {
+            setMessages(prev => [...prev, result.messages[0]]);
+          }
+        }, 2000);
+        unlistenRef.current = () => clearInterval(interval);
+      }
     } catch (err) {
       alert('启动消费失败: ' + (err instanceof Error ? err.message : '未知错误'));
     }
@@ -76,6 +111,7 @@ export function ConsumerPage() {
   const stopConsumption = async () => {
     if (sessionId) {
       try {
+        const tauriService = await getService();
         await tauriService.stopConsuming(sessionId);
       } catch (err) {
         console.error('Failed to stop consuming:', err);
