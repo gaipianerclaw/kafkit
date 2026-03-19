@@ -13,6 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "Kafkit",
         "width": 1400,
         "height": 900,
@@ -32,10 +33,20 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg"],
+    "targets": ["dmg", "deb", "rpm", "msi"],
     "resources": [],
     "category": "DeveloperTool",
     "shortDescription": "Kafka Desktop Client",
-    "longDescription": "A cross-platform desktop client for Apache Kafka"
+    "longDescription": "A cross-platform desktop client for Apache Kafka",
+    "publisher": "Kafkit",
+    "copyright": "Copyright (c) 2025 Kafkit",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
   }
 }

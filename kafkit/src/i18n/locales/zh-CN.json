@@ -1,0 +1,120 @@
+{
+  "common": {
+    "refresh": "刷新",
+    "create": "创建",
+    "cancel": "取消",
+    "delete": "删除",
+    "back": "返回",
+    "loading": "加载中...",
+    "actions": "操作",
+    "unknownError": "未知错误",
+    "save": "保存",
+    "edit": "编辑",
+    "close": "关闭",
+    "confirm": "确认",
+    "search": "搜索"
+  },
+  "nav": {
+    "connections": "连接管理",
+    "topics": "Topic 管理",
+    "consumerGroups": "消费组",
+    "settings": "设置",
+    "help": "帮助"
+  },
+  "connections": {
+    "title": "管理连接",
+    "new": "新建连接",
+    "edit": "编辑连接",
+    "manageDesc": "管理 Kafka 集群连接",
+    "createFirst": "创建你的第一个 Kafka 连接",
+    "connect": "连接",
+    "name": "连接名称",
+    "bootstrapServers": "Bootstrap Servers",
+    "protocol": "协议",
+    "authType": "认证方式",
+    "test": "测试连接",
+    "create": "创建连接",
+    "save": "保存连接",
+    "deleteConfirm": "确定要删除连接 \"{name}\" 吗？",
+    "testSuccess": "连接成功",
+    "testFailed": "连接失败",
+    "loading": "加载连接...",
+    "noConnections": "暂无连接，点击右上角按钮创建",
+    "selectConnection": "请先选择一个连接",
+    "form": {
+      "namePlaceholder": "生产环境 Kafka",
+      "serversPlaceholder": "localhost:9092,localhost:9093",
+      "serversHint": "多个地址用逗号分隔，格式：host:port"
+    }
+  },
+  "topics": {
+    "title": "Topics",
+    "create": "新建 Topic",
+    "createTitle": "创建新 Topic",
+    "name": "Topic 名称",
+    "partitions": "分区数",
+    "replicationFactor": "副本因子",
+    "searchPlaceholder": "搜索 Topic...",
+    "viewDetail": "查看详情",
+    "consume": "消费消息",
+    "produce": "发送消息",
+    "deleteConfirm": "确定要删除 Topic \"{name}\" 吗？此操作不可恢复！",
+    "empty": "暂无 Topic",
+    "noMatch": "未找到匹配的 Topic",
+    "loadError": "加载失败",
+    "createError": "创建失败",
+    "deleteError": "删除失败",
+    "selectConnection": "请先选择一个连接"
+  },
+  "topicDetail": {
+    "title": "Topic 详情",
+    "partitions": "分区详情",
+    "configs": "配置参数",
+    "stats": {
+      "totalPartitions": "分区总数",
+      "totalMessages": "总消息数",
+      "replicationFactor": "平均副本因子",
+      "totalReplicas": "总副本数"
+    },
+    "table": {
+      "partition": "Partition",
+      "leader": "Leader",
+      "replicas": "Replicas",
+      "isr": "ISR",
+      "earliestOffset": "最早 Offset",
+      "latestOffset": "最新 Offset",
+      "messageCount": "消息数"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": {
+      "title": "主题",
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    },
+    "about": "关于",
+    "version": "版本"
+  },
+  "welcome": {
+    "title": "欢迎使用 Kafkit",
+    "subtitle": "跨平台 Kafka 桌面客户端",
+    "getStarted": "开始使用",
+    "features": {
+      "connections": {
+        "title": "连接管理",
+        "description": "支持多种安全协议，包括 PLAINTEXT、SSL、SASL"
+      },
+      "topics": {
+        "title": "Topic 管理",
+        "description": "查看 Topic 详情、分区信息、Offset 等"
+      },
+      "messages": {
+        "title": "消息操作",
+        "description": "消费和生产消息，支持多种序列化格式"
+      }
+    }
+  }
+}

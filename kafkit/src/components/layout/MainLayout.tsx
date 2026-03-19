@@ -10,9 +10,11 @@ import {
 } from 'lucide-react';
 import { useConnectionStore } from '../../stores';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function MainLayout() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { connections, activeConnection, fetchConnections, setActiveConnection } = useConnectionStore();
   const [showConnectionMenu, setShowConnectionMenu] = useState(false);
 
@@ -25,7 +27,7 @@ export function MainLayout() {
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card flex flex-col">
+      <aside className="w-64 h-screen border-r border-border bg-card flex flex-col flex-shrink-0 overflow-hidden">
         {/* Logo */}
         <div className="h-14 flex items-center px-4 border-b border-border">
           <Database className="w-6 h-6 text-primary mr-2" />
@@ -42,7 +44,7 @@ export function MainLayout() {
               <div className="flex items-center min-w-0">
                 <Server className="w-4 h-4 mr-2 flex-shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm">
-                  {activeConn ? activeConn.name : '选择连接'}
+                  {activeConn ? activeConn.name : t('connections.selectConnection')}
                 </span>
               </div>
               <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
@@ -76,7 +78,7 @@ export function MainLayout() {
                   className="w-full flex items-center px-3 py-2 text-sm text-primary hover:bg-muted transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  新建连接
+                  {t('connections.new')}
                 </button>
                 <button
                   onClick={() => {
@@ -86,7 +88,7 @@ export function MainLayout() {
                   className="w-full flex items-center px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  管理连接
+                  {t('connections.title')}
                 </button>
               </div>
             )}
@@ -94,7 +96,7 @@ export function MainLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           <NavLink
             to="/main/topics"
             className={({ isActive }) =>
@@ -106,7 +108,7 @@ export function MainLayout() {
             }
           >
             <List className="w-4 h-4 mr-3" />
-            Topics
+            {t('nav.topics')}
           </NavLink>
           <NavLink
             to="/main/groups"
@@ -119,21 +121,30 @@ export function MainLayout() {
             }
           >
             <Users className="w-4 h-4 mr-3" />
-            Consumer Groups
+            {t('nav.consumerGroups')}
           </NavLink>
         </nav>
 
         {/* Footer */}
         <div className="p-3 border-t border-border">
-          <button className="flex items-center px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+          <NavLink
+            to="/main/settings"
+            className={({ isActive }) =>
+              `flex items-center px-3 py-2 text-sm transition-colors ${
+                isActive
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`
+            }
+          >
             <Settings className="w-4 h-4 mr-3" />
-            设置
-          </button>
+            {t('nav.settings')}
+          </NavLink>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Outlet />
       </main>
     </div>

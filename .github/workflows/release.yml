@@ -1,10 +1,9 @@
-name: Build
+name: Release
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    tags:
+      - 'v*.*.*'
 
 jobs:
   build:
@@ -83,33 +82,37 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: kafkit
           args: ${{ matrix.args }}
-
-      - name: Upload artifacts (macOS)
-        if: matrix.platform == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: kafkit-${{ matrix.name }}
-          path: |
-            kafkit/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-
-      - name: Upload artifacts (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        uses: actions/upload-artifact@v4
-        with:
-          name: kafkit-${{ matrix.name }}
-          path: |
-            kafkit/src-tauri/target/release/bundle/**/*.deb
-            kafkit/src-tauri/target/release/bundle/**/*.rpm
-            kafkit/src-tauri/target/release/bundle/**/*.AppImage
-
-      - name: Upload artifacts (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: kafkit-${{ matrix.name }}
-          path: |
-            kafkit/src-tauri/target/release/bundle/**/*.msi
-            kafkit/src-tauri/target/release/bundle/**/*.exe
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Kafkit ${{ github.ref_name }}'
+          releaseBody: |
+            ## 下载
+            
+            ### macOS
+            - Apple Silicon (M1/M2/M3): `Kafkit_*_aarch64.dmg`
+            - Intel: `Kafkit_*_x64.dmg`
+            
+            ### Linux
+            - Ubuntu/Debian: `kafkit_*_amd64.deb`
+            - Fedora/RHEL: `kafkit-*.x86_64.rpm`
+            
+            ### Windows
+            - Installer: `Kafkit_*_x64-setup.exe`
+            - MSI: `Kafkit_*_x64_en-US.msi`
+            
+            ## 系统要求
+            - macOS 11.0+
+            - Linux: Ubuntu 20.04+ / Fedora 35+ (glibc 2.17+)
+            - Windows 10 1809+ / Windows 11
+            
+            ## 功能特性
+            - ✅ Kafka 连接管理 (PLAINTEXT/SSL/SASL)
+            - ✅ Topic 浏览与详情查看
+            - ✅ 分区、副本、ISR、Offset 信息
+            - ✅ 无需额外依赖，开箱即用
+          releaseDraft: true
+          prerelease: false

@@ -29,11 +29,27 @@ export async function getConnection(id: string): Promise<Connection> {
 }
 
 export async function testConnection(config: ConnectionConfig): Promise<ConnectionTestResult> {
-  return invoke('test_connection', { config });
+  console.log('[Kafkit] Calling test_connection with:', config);
+  try {
+    const result = await invoke('test_connection', { config });
+    console.log('[Kafkit] test_connection result:', result);
+    return result as ConnectionTestResult;
+  } catch (error) {
+    console.error('[Kafkit] test_connection failed:', error);
+    throw error;
+  }
 }
 
 export async function createConnection(config: ConnectionConfig): Promise<Connection> {
-  return invoke('create_connection', { config });
+  console.log('[Kafkit] Calling create_connection with:', JSON.stringify(config, null, 2));
+  try {
+    const result = await invoke('create_connection', { config });
+    console.log('[Kafkit] create_connection succeeded:', result);
+    return result as Connection;
+  } catch (error) {
+    console.error('[Kafkit] create_connection failed:', error);
+    throw error;
+  }
 }
 
 export async function updateConnection(id: string, config: ConnectionConfig): Promise<Connection> {

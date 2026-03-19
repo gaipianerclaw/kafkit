@@ -2,301 +2,187 @@
 
 ## 目录
 
-1. [快速开始](#快速开始)
-2. [连接管理](#连接管理)
-3. [Topic 操作](#topic-操作)
-4. [消息消费](#消息消费)
-5. [消息生产](#消息生产)
-6. [Consumer Group 管理](#consumer-group-管理)
-7. [快捷键](#快捷键)
-8. [常见问题](#常见问题)
+1. [安装](#安装)
+2. [快速开始](#快速开始)
+3. [连接管理](#连接管理)
+4. [Topic 管理](#topic-管理)
+5. [设置](#设置)
+
+---
+
+## 安装
+
+### macOS
+
+1. 下载 `Kafkit_1.0.1_aarch64.dmg` (Apple Silicon) 或 `Kafkit_1.0.1_x64.dmg` (Intel)
+2. 双击打开 DMG 文件
+3. 将 Kafkit 拖到 Applications 文件夹
+4. 首次运行时，在"系统设置 > 隐私与安全性"中允许打开
+
+### Linux
+
+**Ubuntu/Debian:**
+```bash
+sudo dpkg -i kafkit_1.0.1_amd64.deb
+# 如果有依赖问题
+sudo apt-get install -f
+```
+
+**Fedora/RHEL:**
+```bash
+sudo rpm -i kafkit-1.0.1-1.x86_64.rpm
+```
+
+### Windows
+
+1. 下载 `Kafkit_1.0.1_x64-setup.exe`
+2. 双击运行安装程序
+3. 按向导完成安装
 
 ---
 
 ## 快速开始
 
-### 首次启动
+### 1. 创建 Kafka 连接
 
-1. 启动 Kafkit 应用
-2. 点击"创建第一个连接"
-3. 填写 Kafka 连接信息
-4. 测试连接并保存
+1. 点击左上角连接选择器
+2. 选择"新建连接"
+3. 填写连接信息：
+   - **名称**: 给连接起个名字（如"生产环境"）
+   - **Bootstrap Servers**: Kafka 地址（如 `localhost:9092`）
+   - **协议**: 选择安全协议（PLAINTEXT/SSL/SASL_PLAINTEXT/SASL_SSL）
+   - **认证**: 根据协议选择认证方式
+4. 点击"测试连接"验证
+5. 点击"创建"保存
 
-### 界面概览
+### 2. 查看 Topics
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Kafkit                                          [搜索] [设置] │
-├──────────┬──────────────────────────────────────────────────┤
-│          │                                                  │
-│ 连接选择  │                  主内容区                        │
-│  ▼ Prod  │                                                  │
-│          │  ┌────────────────────────────────────────────┐  │
-│ Topics   │  │             Topic 列表/详情                 │  │
-│ Groups   │  │                                            │  │
-│          │  │                                            │  │
-│ ──────── │  │                                            │  │
-│          │  │                                            │  │
-│ 设置     │  └────────────────────────────────────────────┘  │
-│          │                                                  │
-└──────────┴──────────────────────────────────────────────────┘
-```
+1. 从连接选择器选择一个连接
+2. 点击左侧菜单"Topics"
+3. 查看该连接的所有 Topic 列表
+
+### 3. 查看 Topic 详情
+
+1. 在 Topics 列表中点击 Topic 名称
+2. 查看：
+   - 分区信息
+   - Leader Broker
+   - Replicas
+   - ISR (In-Sync Replicas)
+   - Offset 范围
+   - 消息数量
 
 ---
 
 ## 连接管理
 
-### 创建新连接
+### 支持的协议
 
-1. 点击左侧边栏的连接下拉菜单
-2. 选择"新建连接"
-3. 填写连接信息：
+| 协议 | 说明 | 适用场景 |
+|------|------|----------|
+| PLAINTEXT | 无加密 | 内网、开发环境 |
+| SSL | TLS 加密 | 生产环境 |
+| SASL_PLAINTEXT | SASL 认证 | 需要用户名密码 |
+| SASL_SSL | SASL + TLS | 高安全要求 |
 
-| 字段 | 说明 | 示例 |
-|------|------|------|
-| 连接名称 | 显示名称 | Production Cluster |
-| Bootstrap Servers | Kafka 地址，多个用逗号分隔 | `localhost:9092` 或 `host1:9092,host2:9092` |
-| 安全协议 | 连接协议 | PLAINTEXT / SASL_SSL / SSL |
-| 认证方式 | 认证类型 | 无 / SASL/PLAIN / SASL/SCRAM |
+### SSL 配置
 
-4. 点击"测试连接"验证
-5. 点击"创建"保存
+需要以下证书文件：
+- **CA 证书**: 服务器根证书
+- **客户端证书** (可选): 双向认证时使用
+- **客户端密钥** (可选): 双向认证时使用
 
-### 认证配置示例
+### SASL 认证
 
-#### PLAINTEXT (无认证)
-```
-安全协议: PLAINTEXT
-认证方式: 无认证
-```
-
-#### SASL/PLAIN
-```
-安全协议: SASL_PLAINTEXT
-认证方式: SASL/PLAIN
-用户名: admin
-密码: admin-secret
-```
-
-#### SASL/SCRAM
-```
-安全协议: SASL_SSL
-认证方式: SASL/SCRAM
-SCRAM 机制: SCRAM-SHA-256
-用户名: user
-密码: password
-```
-
-#### SSL
-```
-安全协议: SSL
-认证方式: SSL
-CA 证书路径: /path/to/ca.crt
-客户端证书路径: /path/to/client.crt
-客户端密钥路径: /path/to/client.key
-```
+支持以下机制：
+- **PLAIN**: 用户名/密码
+- **SCRAM-SHA-256**: 安全的用户名/密码
+- **SCRAM-SHA-512**: 更安全的用户名/密码
+- **GSSAPI**: Kerberos 认证
 
 ---
 
-## Topic 操作
+## Topic 管理
 
-### 查看 Topic 列表
+### 新建 Topic
 
-1. 选择左侧导航的 "Topics"
-2. 使用顶部搜索框过滤 Topic
-3. 点击刷新按钮更新列表
-
-### 查看 Topic 详情
-
-1. 在 Topic 列表中点击 Topic 名称
-2. 查看分区信息、副本分布、配置参数
-
-分区信息包含：
-- Partition ID
-- Leader Broker
-- Replicas (副本分布)
-- ISR (同步副本)
-- 消息偏移量范围
-
-### 创建 Topic
-
-1. 点击 Topic 列表页的"新建 Topic"按钮
-2. 填写信息：
-   - Topic 名称
-   - 分区数
-   - 副本因子
-   - 可选配置参数
+1. 在 Topics 页面点击"新建 Topic"
+2. 填写：
+   - **Topic 名称**: 支持字母、数字、点、下划线
+   - **分区数**: 默认 1，可根据并发需求调整
+   - **副本因子**: 默认 1，生产环境建议 3
+3. 点击"创建"
 
 ### 删除 Topic
 
 ⚠️ **警告**: 删除操作不可恢复！
 
-1. 在 Topic 列表中找到要删除的 Topic
-2. 点击操作列的删除图标
-3. 确认删除
+1. 在 Topics 列表中找到要删除的 Topic
+2. 点击右侧的删除图标
+3. 在确认对话框中确认删除
+
+⚠️ 注意：Kafka 默认不允许删除 Topic，需要在 Kafka 配置中设置 `delete.topic.enable=true`
 
 ---
 
-## 消息消费
+## 设置
 
-### 实时消费
+### 切换语言
 
-1. 在 Topic 列表中选择 Topic
-2. 点击"消费"按钮
-3. 选择分区（可选，默认所有分区）
-4. 点击"开始"按钮
+1. 点击左侧菜单"设置"
+2. 在"语言"部分选择：
+   - 简体中文
+   - English
 
-消费界面功能：
-- **暂停/恢复**: 控制消费流
-- **清空**: 清空当前显示的消息
-- **导出**: 导出消息到 JSON 文件
-- **格式选择**: 自动/JSON/纯文本
+### 切换主题
 
-### 查看历史消息
+1. 点击左侧菜单"设置"
+2. 在"主题"部分选择：
+   - **浅色**: 始终使用浅色主题
+   - **深色**: 始终使用深色主题
+   - **跟随系统**: 根据系统主题自动切换
 
-1. 在消费页面选择特定分区
-2. 消息会自动从最新位置开始消费
-3. 滚动查看历史消息
+### 关于
 
-### 消息显示格式
-
-| 格式 | 说明 |
-|------|------|
-| 自动检测 | 自动识别 JSON 并格式化 |
-| JSON | 强制以 JSON 格式解析 |
-| 纯文本 | 原始文本显示 |
-
----
-
-## 消息生产
-
-### 发送单条消息
-
-1. 在 Topic 列表中选择 Topic
-2. 点击"发送"按钮
-3. 填写消息信息：
-   - Partition (可选，自动分配)
-   - Key (可选)
-   - Value (消息内容)
-
-4. 点击"发送"
-
-### 批量发送
-
-1. 在发送页面切换到"批量"模式
-2. 每行输入一条消息
-3. 选择消息格式
-4. 点击"批量发送"
-
-### 消息格式
-
-**JSON 示例**:
-```json
-{
-  "id": 12345,
-  "message": "Hello Kafka",
-  "timestamp": "2026-03-13T10:00:00Z"
-}
-```
-
-**CSV 示例**:
-```csv
-id,name,value
-1,test,100
-2,demo,200
-```
-
-**纯文本示例**:
-```
-Hello, this is a plain text message
-```
-
----
-
-## Consumer Group 管理
-
-### 查看 Consumer Groups
-
-1. 选择左侧导航的 "Consumer Groups"
-2. 查看 Group 列表
-3. 点击 Group 查看详细信息
-
-### 查看消费 Lag
-
-1. 选择一个 Consumer Group
-2. 在右侧查看 Lag 信息：
-   - Topic
-   - Partition
-   - Current Offset
-   - Log End Offset
-   - Lag (延迟消息数)
-
-Lag 颜色说明：
-- 🟢 Lag = 0: 消费正常
-- 🟡 Lag < 1000: 轻微延迟
-- 🔴 Lag >= 1000: 严重延迟
-
----
-
-## 快捷键
-
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl/Cmd + T` | 新建连接 |
-| `Ctrl/Cmd + R` | 刷新当前页面 |
-| `Ctrl/Cmd + F` | 搜索/过滤 |
-| `Ctrl/Cmd + 1` | 切换到 Topics |
-| `Ctrl/Cmd + 2` | 切换到 Groups |
-| `Esc` | 取消/关闭 |
+在设置页面底部查看：
+- 应用版本
+- Kafka 客户端版本
+- 其他信息
 
 ---
 
 ## 常见问题
 
-### Q: 连接失败怎么办？
+### Q: 连接测试失败怎么办？
 
-A: 请检查：
-1. Bootstrap Servers 地址是否正确
-2. 端口是否开放
-3. 防火墙设置
-4. 认证信息是否正确
+A: 检查以下几点：
+1. Kafka 地址和端口是否正确
+2. 网络是否可达（尝试 `telnet host port`）
+3. 安全协议和认证信息是否正确
+4. 防火墙是否允许访问
 
-### Q: 如何查看连接是否成功？
+### Q: 无法删除 Topic？
 
-A: 在连接列表中，连接名称左侧的指示灯：
-- 🟢 绿色: 连接正常
-- ⚪ 灰色: 未连接
+A: Kafka 默认禁止删除 Topic。需要在 Kafka 配置 (`server.properties`) 中添加：
+```properties
+delete.topic.enable=true
+```
+然后重启 Kafka。
 
-### Q: 消息消费没有数据？
+### Q: 连接后看不到 Topics？
 
 A: 可能原因：
-1. Topic 中没有新消息
-2. 选择了错误的分区
-3. 消费者组已消费完所有消息
+1. 该 Kafka 集群确实没有 Topics
+2. 当前用户没有权限查看 Topics
+3. 连接配置有误（如错误的 SASL 认证）
 
-### Q: 如何导出消息？
+### Q: 如何查看 Consumer Group？
 
-A: 在消费页面：
-1. 点击"导出"按钮
-2. 选择保存位置
-3. 消息将导出为 JSON 格式
-
-### Q: 支持哪些 Kafka 版本？
-
-A: Kafkit 支持 Kafka 2.0.0 及以上版本。
-
-### Q: 数据存储在哪里？
-
-A: 配置存储在：
-- macOS: `~/Library/Application Support/com.kafkit.app/`
-- Windows: `%APPDATA%/kafkit/`
-- Linux: `~/.config/kafkit/`
+A: 点击左侧菜单"Consumer Groups"查看消费组信息。
 
 ---
 
-## 反馈与支持
+## 技术支持
 
-如有问题或建议，请通过以下方式反馈：
-
-- GitHub Issues: https://github.com/yourusername/kafkit/issues
-- 邮件: support@kafkit.dev
+- GitHub Issues: https://github.com/gaipianerclaw/kafkit/issues
+- 邮箱: (你的邮箱)

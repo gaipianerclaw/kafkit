@@ -1,16 +1,18 @@
-import React from "react";
+import React, { ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import "./i18n";
 import "./styles/index.css";
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+  { children: ReactNode },
   { hasError: boolean; error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
   }
@@ -66,13 +68,13 @@ if (!root) {
   console.log('[Kafkit] Root element found, rendering...');
   
   ReactDOM.createRoot(root).render(
-    <React.StrictMode>
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />
         </QueryClientProvider>
-      </ErrorBoundary>
-    </React.StrictMode>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
   
   console.log('[Kafkit] Render complete');

@@ -5,6 +5,15 @@ description = "A cross-platform Kafka desktop client"
 edition = "2021"
 rust-version = "1.75"
 
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+panic = "abort"
+
+[profile.release.build-override]
+opt-level = 3
+
 [lib]
 name = "kafkit_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -17,7 +26,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 serde = { version = "1", features = ["derive"] }
@@ -26,3 +35,4 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync", "net", "time"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 thiserror = "1"
+rdkafka = { version = "0.36", default-features = false, features = ["cmake-build", "libz-static", "ssl-vendored", "tokio"] }

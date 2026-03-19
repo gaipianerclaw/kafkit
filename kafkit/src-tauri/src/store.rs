@@ -1,6 +1,6 @@
-use crate::models::{AppError, AuthConfig, Connection, ConnectionConfig, SecurityConfig};
+use crate::models::{AppError, Connection, ConnectionConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
 use tauri::{AppHandle, Manager};
 
 const CONFIG_FILE: &str = "connections.json";

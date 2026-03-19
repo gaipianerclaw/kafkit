@@ -1,134 +1,148 @@
 # Kafkit
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/gaipianerclaw/kafkit/releases)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+跨平台 Kafka 桌面客户端，支持 macOS、Linux 和 Windows。
 
-跨平台 Kafka 桌面客户端，基于 Tauri + React + Rust 构建。
-
-![Kafkit Screenshot](docs/screenshot.png)
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能特性
 
-- 🔌 **连接管理** - 支持多 Kafka 集群连接配置，支持 SASL/SSL 认证
-- 📋 **Topic 浏览** - 查看 Topic 列表、分区信息、配置参数
-- 📤 **消息生产** - 支持单条/批量消息发送，JSON/CSV/文本格式
-- 📥 **消息消费** - 实时消费消息，支持分区筛选，自动格式化 JSON
-- 👥 **消费组监控** - 查看 Consumer Group 状态和消费延迟 (Lag)
-- 🔍 **消息搜索** - 按关键词搜索消息内容
-- 🎨 **现代 UI** - 简洁美观的界面设计，支持深色模式
+- 🔗 **连接管理**: 支持 PLAINTEXT、SSL、SASL_PLAINTEXT、SASL_SSL 协议
+- 📋 **Topic 管理**: 查看 Topic 列表、详情、分区、副本、ISR、Offset
+- 🌐 **国际化**: 支持简体中文和英文
+- 🎨 **深色模式**: 支持浅色/深色/跟随系统主题
+- 🔒 **安全连接**: 支持 SSL 证书和 SASL 认证
+- 📊 **分区详情**: 查看 Leader、Replicas、ISR、消息偏移量
+
+## 系统要求
+
+| 平台 | 最低版本 |
+|------|----------|
+| macOS | 11.0+ (Big Sur) |
+| Linux | Ubuntu 20.04+ / Fedora 35+ |
+| Windows | Windows 10 1809+ / Windows 11 |
+
+## 下载安装
+
+### macOS
+- [下载 Apple Silicon 版本](https://github.com/gaipianerclaw/kafkit/releases)
+- [下载 Intel 版本](https://github.com/gaipianerclaw/kafkit/releases)
+
+### Linux
+- [下载 .deb (Ubuntu/Debian)](https://github.com/gaipianerclaw/kafkit/releases)
+- [下载 .rpm (Fedora/RHEL)](https://github.com/gaipianerclaw/kafkit/releases)
+
+### Windows
+- [下载 Installer](https://github.com/gaipianerclaw/kafkit/releases)
+- [下载 MSI](https://github.com/gaipianerclaw/kafkit/releases)
+
+## 快速开始
+
+1. **创建连接**
+   - 点击左上角连接选择器
+   - 选择"新建连接"
+   - 填写连接信息（名称、Bootstrap Servers、协议、认证）
+   - 点击"测试连接"验证
+
+2. **查看 Topics**
+   - 选择一个连接
+   - 点击左侧"Topics"
+   - 查看 Topic 列表
+
+3. **Topic 详情**
+   - 点击 Topic 名称或"查看详情"
+   - 查看分区信息、Leader、Replicas、ISR、Offset
+
+4. **新建 Topic**
+   - 在 Topics 页面点击"新建 Topic"
+   - 填写名称、分区数、副本因子
+   - 点击创建
 
 ## 技术栈
 
-- **前端**: React 18 + TypeScript + Tailwind CSS + Vite
-- **桌面框架**: Tauri v2
-- **后端**: Rust + Tokio
-- **状态管理**: Zustand
-- **数据获取**: TanStack Query
+- **前端**: React 18 + TypeScript + Tailwind CSS
+- **桌面框架**: Tauri 2.x
+- **Kafka 客户端**: rdkafka (Rust)
+- **国际化**: i18next
+- **构建工具**: Vite
 
-## 安装
+## 开发构建
 
-### 下载预编译版本
-
-访问 [Releases](https://github.com/gaipianerclaw/kafkit/releases) 页面下载对应平台的安装包。
-
-### 从源码构建
-
-**环境要求：**
-- Node.js 18+
+### 环境要求
 - Rust 1.75+
-- 系统依赖（Linux）：
-  ```bash
-  sudo apt install pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev
-  ```
+- Node.js 18+
+- npm 或 yarn
 
-**构建步骤：**
-
+### macOS
 ```bash
-# 克隆仓库
-git clone https://github.com/gaipianerclaw/kafkit.git
-cd kafkit/kafkit
-
-# 安装依赖
+cd kafkit
 npm install
-
-# 开发模式运行
-npm run tauri:dev
-
-# 构建生产版本
 npm run tauri:build
 ```
 
-## 使用指南
+### Linux (Ubuntu)
+```bash
+# 安装依赖
+sudo apt-get update
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev cmake
 
-### 快速开始
+# 构建
+cd kafkit
+npm install
+npm run tauri:build
+```
 
-1. 启动应用后，点击"创建第一个连接"
-2. 输入连接名称和 Kafka 地址（如 `localhost:9092`）
-3. 点击"测试连接"验证配置
-4. 保存后即可浏览 Topics 和消费/生产消息
+### Windows
+```powershell
+# 安装 Visual Studio Build Tools (选择"使用 C++ 的桌面开发")
 
-### 连接配置
-
-支持以下认证方式：
-- **无认证** - 适用于本地开发或内网环境
-- **SASL/PLAIN** - 用户名/密码认证
-- **SASL/SCRAM** - 更安全的认证机制
-- **SSL/TLS** - 加密连接
+# 构建
+cd kafkit
+npm install
+npm run tauri:build
+```
 
 ## 项目结构
 
 ```
-kafkit/
-├── src/                    # 前端源码
-│   ├── components/         # React 组件
-│   ├── pages/             # 页面组件
-│   ├── services/          # Tauri 服务调用
-│   ├── stores/            # Zustand 状态管理
-│   └── styles/            # 全局样式
-├── src-tauri/             # Tauri/Rust 后端
-│   ├── src/               # Rust 源码
-│   └── Cargo.toml         # Rust 依赖
-├── docs/                  # 文档
-└── package.json           # Node.js 依赖
+kafka-connector/
+├── kafkit/                 # 主项目目录
+│   ├── src/
+│   │   ├── components/     # UI 组件
+│   │   ├── pages/          # 页面组件
+│   │   ├── services/       # API 服务
+│   │   ├── stores/         # 状态管理
+│   │   ├── i18n/           # 国际化配置
+│   │   └── contexts/       # React Context
+│   ├── src-tauri/          # Rust 后端
+│   │   └── src/
+│   │       ├── commands.rs # Tauri 命令
+│   │       ├── services.rs # Kafka 服务
+│   │       └── models.rs   # 数据模型
+│   └── package.json
+└── README.md
 ```
 
-## 开发
+## 关键更新
 
-```bash
-# 启动开发服务器（前端热更新）
-npm run dev
-
-# 启动 Tauri 开发模式（完整桌面应用）
-npm run tauri:dev
-
-# 运行测试
-npm run test
-npm run test:coverage
-
-# 构建
-npm run build
-npm run tauri:build
-```
-
-## 更新日志
-
-### v1.0.1 (2026-03-18)
-
-**修复：**
-- 🐛 修复桌面端空白页面问题 - 添加 Tauri 环境检测和动态导入
-
-### v1.0.0 (2026-03-13)
-
-**初始版本：**
-- ✨ 连接管理和测试
-- ✨ Topic 浏览和详情
-- ✨ 消息生产和消费
-- ✨ Consumer Group 监控
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+### v1.0.1
+- ✅ Kafka 客户端库从 `kafka` 切换到 `rdkafka`
+- ✅ 支持 SSL/SASL 安全认证
+- ✅ 添加国际化支持（中/英）
+- ✅ 添加深色模式
+- ✅ 优化 Topic 列表加载体验
+- ✅ 支持创建 Topic
 
 ## 许可证
 
-MIT License © 2026 Kafkit Contributors
+MIT License
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request。
+
+## 相关链接
+
+- [GitHub 仓库](https://github.com/gaipianerclaw/kafkit)
+- [Tauri 文档](https://tauri.app/)
+- [rdkafka 文档](https://docs.rs/rdkafka/)

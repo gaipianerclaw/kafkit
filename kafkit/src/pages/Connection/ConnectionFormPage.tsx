@@ -41,6 +41,7 @@ export function ConnectionFormPage() {
     bootstrapServers: '',
     auth: { type: 'none' },
     security: { protocol: 'PLAINTEXT' },
+    options: {},
   });
 
   const [testing, setTesting] = useState(false);
@@ -90,14 +91,22 @@ export function ConnectionFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    console.log('[Kafkit] Submitting form:', JSON.stringify(formData, null, 2));
     try {
+      // 确保 options 字段存在
+      const configToSubmit: ConnectionConfig = {
+        ...formData,
+        options: formData.options || {},
+      };
+      
       if (isEdit && id) {
-        await updateConnection(id, formData);
+        await updateConnection(id, configToSubmit);
       } else {
-        await createConnection(formData);
+        await createConnection(configToSubmit);
       }
       navigate('/main/connections');
     } catch (error) {
+      console.error('[Kafkit] Save failed:', error);
       alert('保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
     } finally {
       setSaving(false);
@@ -237,7 +246,24 @@ export function ConnectionFormPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-            <h2 className="text-lg font-medium mb-4">基本信息</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium">基本信息</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData({
+                    name: 'EC2 Kafka Test',
+                    bootstrapServers: 'ec2-dmz-kafka-01:9092',
+                    auth: { type: 'none' },
+                    security: { protocol: 'PLAINTEXT' },
+                    options: {},
+                  });
+                }}
+                className="text-xs text-primary hover:underline"
+              >
+                填入测试配置
+              </button>
+            </div>
             
             <Input
               label="连接名称"
@@ -255,7 +281,7 @@ export function ConnectionFormPage() {
               placeholder="localhost:9092,localhost:9093"
             />
             <p className="text-xs text-muted-foreground">
-              多个地址用逗号分隔，格式：host:port
+              多个地址用逗号分隔，格式：host:port (例如: ec2-dmz-kafka-01:9092)
             </p>
           </div>
 

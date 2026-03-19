@@ -1,0 +1,120 @@
+{
+  "common": {
+    "refresh": "Refresh",
+    "create": "Create",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "back": "Back",
+    "loading": "Loading...",
+    "actions": "Actions",
+    "unknownError": "Unknown error",
+    "save": "Save",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "search": "Search"
+  },
+  "nav": {
+    "connections": "Connections",
+    "topics": "Topics",
+    "consumerGroups": "Consumer Groups",
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "connections": {
+    "title": "Manage Connections",
+    "new": "New Connection",
+    "edit": "Edit Connection",
+    "manageDesc": "Manage Kafka cluster connections",
+    "createFirst": "Create your first Kafka connection",
+    "connect": "Connect",
+    "name": "Connection Name",
+    "bootstrapServers": "Bootstrap Servers",
+    "protocol": "Protocol",
+    "authType": "Authentication",
+    "test": "Test Connection",
+    "create": "Create Connection",
+    "save": "Save Connection",
+    "deleteConfirm": "Are you sure you want to delete connection \"{name}\"?",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "loading": "Loading connections...",
+    "noConnections": "No connections yet, click the button above to create",
+    "selectConnection": "Please select a connection first",
+    "form": {
+      "namePlaceholder": "Production Kafka",
+      "serversPlaceholder": "localhost:9092,localhost:9093",
+      "serversHint": "Multiple addresses separated by comma, format: host:port"
+    }
+  },
+  "topics": {
+    "title": "Topics",
+    "create": "New Topic",
+    "createTitle": "Create New Topic",
+    "name": "Topic Name",
+    "partitions": "Partitions",
+    "replicationFactor": "Replication Factor",
+    "searchPlaceholder": "Search topics...",
+    "viewDetail": "View Details",
+    "consume": "Consume Messages",
+    "produce": "Produce Messages",
+    "deleteConfirm": "Are you sure you want to delete topic \"{name}\"? This action cannot be undone!",
+    "empty": "No topics available",
+    "noMatch": "No matching topics found",
+    "loadError": "Failed to load",
+    "createError": "Failed to create",
+    "deleteError": "Failed to delete",
+    "selectConnection": "Please select a connection first"
+  },
+  "topicDetail": {
+    "title": "Topic Details",
+    "partitions": "Partition Details",
+    "configs": "Configuration",
+    "stats": {
+      "totalPartitions": "Total Partitions",
+      "totalMessages": "Total Messages",
+      "replicationFactor": "Avg Replication Factor",
+      "totalReplicas": "Total Replicas"
+    },
+    "table": {
+      "partition": "Partition",
+      "leader": "Leader",
+      "replicas": "Replicas",
+      "isr": "ISR",
+      "earliestOffset": "Earliest Offset",
+      "latestOffset": "Latest Offset",
+      "messageCount": "Message Count"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": {
+      "title": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "about": "About",
+    "version": "Version"
+  },
+  "welcome": {
+    "title": "Welcome to Kafkit",
+    "subtitle": "Cross-platform Kafka Desktop Client",
+    "getStarted": "Get Started",
+    "features": {
+      "connections": {
+        "title": "Connection Management",
+        "description": "Support multiple security protocols including PLAINTEXT, SSL, SASL"
+      },
+      "topics": {
+        "title": "Topic Management",
+        "description": "View topic details, partition info, offsets, and more"
+      },
+      "messages": {
+        "title": "Message Operations",
+        "description": "Consume and produce messages with multiple serialization formats"
+      }
+    }
+  }
+}

@@ -41,21 +41,29 @@ pub async fn test_connection(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionTestResult> {
+    println!("[Kafkit] Testing connection to: {}", config.bootstrap_servers);
+    
     match state.connection_manager.test_connection(&config).await {
-        Ok(_) => Ok(ConnectionTestResult {
-            success: true,
-            message: format!("成功连接到 {}", config.bootstrap_servers),
-            details: Some({
-                let mut map = std::collections::HashMap::new();
-                map.insert("servers".to_string(), serde_json::json!(config.bootstrap_servers));
-                map
-            }),
-        }),
-        Err(e) => Ok(ConnectionTestResult {
-            success: false,
-            message: e.to_string(),
-            details: None,
-        }),
+        Ok(_) => {
+            println!("[Kafkit] Connection test successful");
+            Ok(ConnectionTestResult {
+                success: true,
+                message: format!("成功连接到 {}", config.bootstrap_servers),
+                details: Some({
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("servers".to_string(), serde_json::json!(config.bootstrap_servers));
+                    map
+                }),
+            })
+        }
+        Err(e) => {
+            println!("[Kafkit] Connection test failed: {:?}", e);
+            Ok(ConnectionTestResult {
+                success: false,
+                message: e.to_string(),
+                details: None,
+            })
+        }
     }
 }
 
@@ -64,8 +72,19 @@ pub async fn create_connection(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<Connection> {
+    println!("[Kafkit] Creating connection: name={}, servers={}", config.name, config.bootstrap_servers);
+    
     let store = state.config_store.lock().await;
-    store.create_connection(config).await
+    match store.create_connection(config).await {
+        Ok(conn) => {
+            println!("[Kafkit] Connection created successfully: id={}", conn.id);
+            Ok(conn)
+        }
+        Err(e) => {
+            println!("[Kafkit] Failed to create connection: {:?}", e);
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -103,13 +122,26 @@ pub async fn list_topics(
     connection_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<TopicInfo>> {
+    println!("[Kafkit] list_topics called for connection: {}", connection_id);
+    
     let store = state.config_store.lock().await;
     let connections = store.get_connections().await?;
     let connection = connections.into_iter()
         .find(|c| c.id == connection_id)
-        .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?;
+        .ok_or_else(|| AppError::ConnectionNotFound(connection_id.clone()))?;
     
-    state.connection_manager.list_topics(&connection).await
+    println!("[Kafkit] Found connection: {} -> {:?}", connection_id, connection.bootstrap_servers);
+    
+    match state.connection_manager.list_topics(&connection).await {
+        Ok(topics) => {
+            println!("[Kafkit] Successfully fetched {} topics", topics.len());
+            Ok(topics)
+        }
+        Err(e) => {
+            println!("[Kafkit] Failed to list topics: {:?}", e);
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -162,8 +194,22 @@ pub async fn start_consuming(
     state: State<'_, AppState>,
 ) -> Result<String> {
     println!("[Kafkit] Start consuming from topic: {:?}", topic);
-    // TODO: 实现真实的消费逻辑
-    Ok(format!("session-{}", uuid::Uuid::new_v4()))
+    
+    // 获取连接信息
+    let store = state.config_store.lock().await;
+    let connections = store.get_connections().await?;
+    let connection = connections.into_iter()
+        .find(|c| c.id == connection_id)
+        .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?;
+    
+    // 启动消费者
+    state.consumer_service.start_consuming(
+        &connection,
+        &topic,
+        partition,
+        start_offset,
+        window,
+    ).await
 }
 
 #[tauri::command]
@@ -172,7 +218,7 @@ pub async fn stop_consuming(
     state: State<'_, AppState>,
 ) -> Result<()> {
     println!("[Kafkit] Stop consuming session: {}", session_id);
-    Ok(())
+    state.consumer_service.stop_consuming(&session_id).await
 }
 
 #[tauri::command]
@@ -257,5 +303,32 @@ pub async fn reset_consumer_offset(
 ) -> Result<()> {
     println!("[Kafkit] Resetting offset for group: {}", group_id);
     // TODO: 实现真实的偏移量重置
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_to_file(
+    file_path: String,
+    content: String,
+) -> Result<()> {
+    println!("[Kafkit] Saving to file: {}", file_path);
+    std::fs::write(&file_path, content)
+        .map_err(|e| AppError::Other(format!("Failed to write file: {}", e)))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn append_to_file(
+    file_path: String,
+    content: String,
+) -> Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+        .map_err(|e| AppError::Other(format!("Failed to open file: {}", e)))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| AppError::Other(format!("Failed to append to file: {}", e)))?;
     Ok(())
 }

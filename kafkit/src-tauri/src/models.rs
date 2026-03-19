@@ -4,6 +4,7 @@ use std::collections::HashMap;
 // ================= Connection Models =================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionSummary {
     pub id: String,
     pub name: String,
@@ -13,6 +14,7 @@ pub struct ConnectionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub id: String,
     pub name: String,
@@ -38,12 +40,14 @@ pub enum AuthConfig {
         password: String,
     },
     #[serde(rename = "saslGssapi")]
+    #[serde(rename_all = "camelCase")]
     SaslGssapi {
         principal: String,
         keytab_path: Option<String>,
         service_name: String,
     },
     #[serde(rename = "ssl")]
+    #[serde(rename_all = "camelCase")]
     Ssl {
         ca_cert: Option<String>,
         client_cert: Option<String>,
@@ -60,6 +64,7 @@ pub enum ScramMechanism {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SecurityConfig {
     pub protocol: SecurityProtocol,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,6 +84,7 @@ pub enum SecurityProtocol {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_timeout_ms: Option<u32>,
@@ -96,6 +102,7 @@ impl Default for ConnectionOptions {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionConfig {
     pub name: String,
     pub bootstrap_servers: String,
@@ -116,6 +123,7 @@ pub struct ConnectionTestResult {
 // ================= Topic Models =================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TopicInfo {
     pub name: String,
     pub partition_count: i32,
@@ -131,6 +139,7 @@ pub struct TopicDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PartitionInfo {
     pub partition: i32,
     pub leader: i32,
@@ -152,6 +161,7 @@ pub struct ConfigEntry {
 // ================= Message Models =================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KafkaMessage {
     pub partition: i32,
     pub offset: i64,
@@ -176,6 +186,7 @@ pub struct ProduceMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProduceResult {
     pub partition: i32,
     pub offset: i64,
@@ -183,12 +194,14 @@ pub struct ProduceResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct BatchProduceOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BatchProduceResult {
     pub success: i32,
     pub failed: i32,
@@ -217,6 +230,7 @@ pub enum OffsetSpec {
 // ================= Consumer Group Models =================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConsumerGroupInfo {
     pub group_id: String,
     pub state: String,
@@ -225,6 +239,7 @@ pub struct ConsumerGroupInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PartitionLag {
     pub topic: String,
     pub partition: i32,

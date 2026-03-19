@@ -9,6 +9,7 @@ import { TopicDetailPage } from "./pages/Topics/TopicDetailPage";
 import { ConsumerPage } from "./pages/Consumer/ConsumerPage";
 import { ProducerPage } from "./pages/Producer/ProducerPage";
 import { GroupListPage } from "./pages/Groups/GroupListPage";
+import { SettingsPage } from "./pages/Settings/SettingsPage";
 
 export const router = createHashRouter([
   {
@@ -31,6 +32,7 @@ export const router = createHashRouter([
       { path: "topics/:topic/consume", element: <ConsumerPage /> },
       { path: "topics/:topic/produce", element: <ProducerPage /> },
       { path: "groups", element: <GroupListPage /> },
+      { path: "settings", element: <SettingsPage /> },
     ],
   },
 ]);

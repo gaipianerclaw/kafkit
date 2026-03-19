@@ -3,9 +3,11 @@ import { Database, Plus, Settings } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function WelcomePage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { connections, fetchConnections, setActiveConnection } = useConnectionStore();
 
   useEffect(() => {
@@ -24,13 +26,13 @@ export function WelcomePage() {
           <Database className="w-10 h-10 text-primary" />
         </div>
         <h1 className="text-4xl font-bold text-foreground mb-3">Kafkit</h1>
-        <p className="text-lg text-muted-foreground">跨平台 Kafka 桌面客户端</p>
+        <p className="text-lg text-muted-foreground">{t('welcome.subtitle')}</p>
       </div>
 
       {connections.length > 0 ? (
         <div className="w-full max-w-md space-y-4">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
-            选择连接
+            {t('connections.selectConnection')}
           </h2>
           <div className="space-y-2">
             {connections.map((conn) => (
@@ -54,20 +56,20 @@ export function WelcomePage() {
           <div className="pt-4 flex gap-3 justify-center">
             <Button variant="outline" onClick={() => navigate('/main/connections')}>
               <Settings className="w-4 h-4 mr-2" />
-              管理连接
+              {t('connections.title')}
             </Button>
             <Button onClick={() => navigate('/main/connections/new')}>
               <Plus className="w-4 h-4 mr-2" />
-              新建连接
+              {t('connections.new')}
             </Button>
           </div>
         </div>
       ) : (
         <div className="text-center">
-          <p className="text-muted-foreground mb-6">暂无连接配置</p>
+          <p className="text-muted-foreground mb-6">{t('connections.noConnections')}</p>
           <Button size="lg" onClick={() => navigate('/main/connections/new')}>
             <Plus className="w-5 h-5 mr-2" />
-            创建第一个连接
+            {t('welcome.getStarted')}
           </Button>
         </div>
       )}

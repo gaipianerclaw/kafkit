@@ -34,6 +34,13 @@ pub fn run() {
                 config_store,
             });
             
+            // 获取主窗口并打开开发者工具
+            #[cfg(debug_assertions)]
+            {
+                let window = app.get_webview_window("main").unwrap();
+                window.open_devtools();
+            }
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -60,6 +67,9 @@ pub fn run() {
             list_consumer_groups,
             get_consumer_lag,
             reset_consumer_offset,
+            // File
+            save_to_file,
+            append_to_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

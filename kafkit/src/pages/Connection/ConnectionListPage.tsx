@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Server, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
+import { useTranslation } from 'react-i18next';
 
 export function ConnectionListPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { connections, fetchConnections, deleteConnection, setActiveConnection } = useConnectionStore();
 
   useEffect(() => {
@@ -13,11 +15,11 @@ export function ConnectionListPage() {
   }, []);
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`确定要删除连接 "${name}" 吗？`)) {
+    if (confirm(t('connections.deleteConfirm', { name }))) {
       try {
         await deleteConnection(id);
       } catch (error) {
-        alert('删除失败: ' + (error instanceof Error ? error.message : '未知错误'));
+        alert(t('common.delete') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
       }
     }
   };
@@ -25,6 +27,17 @@ export function ConnectionListPage() {
   const handleConnect = (id: string) => {
     setActiveConnection(id);
     navigate('/main/topics');
+  };
+
+  const getAuthTypeLabel = (authType: string) => {
+    switch (authType) {
+      case 'none': return t('topics.authTypeNone') || '无认证';
+      case 'saslPlain': return 'SASL/PLAIN';
+      case 'saslScram': return 'SASL/SCRAM';
+      case 'saslGssapi': return 'SASL/GSSAPI';
+      case 'ssl': return 'SSL';
+      default: return authType;
+    }
   };
 
   return (
@@ -37,13 +50,13 @@ export function ConnectionListPage() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">连接管理</h1>
-              <p className="text-sm text-muted-foreground">管理 Kafka 集群连接</p>
+              <h1 className="text-2xl font-bold">{t('connections.title')}</h1>
+              <p className="text-sm text-muted-foreground">{t('connections.manageDesc') || 'Manage Kafka cluster connections'}</p>
             </div>
           </div>
           <Button onClick={() => navigate('/main/connections/new')}>
             <Plus className="w-4 h-4 mr-2" />
-            新建连接
+            {t('connections.new')}
           </Button>
         </div>
 
@@ -51,11 +64,11 @@ export function ConnectionListPage() {
         {connections.length === 0 ? (
           <div className="text-center py-12 bg-card border border-border rounded-lg">
             <Server className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">暂无连接</h3>
-            <p className="text-sm text-muted-foreground mb-4">创建你的第一个 Kafka 连接</p>
+            <h3 className="text-lg font-medium mb-2">{t('connections.noConnections')}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{t('connections.createFirst') || 'Create your first Kafka connection'}</p>
             <Button onClick={() => navigate('/main/connections/new')}>
               <Plus className="w-4 h-4 mr-2" />
-              新建连接
+              {t('connections.new')}
             </Button>
           </div>
         ) : (
@@ -76,11 +89,7 @@ export function ConnectionListPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs px-2 py-0.5 bg-muted rounded text-muted-foreground">
-                      {conn.authType === 'none' ? '无认证' : 
-                       conn.authType === 'saslPlain' ? 'SASL/PLAIN' :
-                       conn.authType === 'saslScram' ? 'SASL/SCRAM' :
-                       conn.authType === 'saslGssapi' ? 'SASL/GSSAPI' :
-                       conn.authType === 'ssl' ? 'SSL' : conn.authType}
+                      {getAuthTypeLabel(conn.authType)}
                     </span>
                   </div>
                 </div>
@@ -91,7 +100,7 @@ export function ConnectionListPage() {
                     size="sm"
                     onClick={() => handleConnect(conn.id)}
                   >
-                    连接
+                    {t('connections.connect') || 'Connect'}
                   </Button>
                   <Button
                     variant="ghost"

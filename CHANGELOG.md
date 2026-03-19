@@ -1,105 +1,133 @@
-# Changelog
+# 更新日志
 
-## [1.0.1] - 2026-03-18
+## v1.0.2 (2026-03-19)
+
+### ✨ 新增功能
+
+#### 1. 消息消费界面大改版
+- 全新设计的消费者界面，支持表头展示（序号、分区、Offset、时间戳、Key、Value预览）
+- 消息展开后显示完整元信息（Offset、Partition、Timestamp、Key、Size、Type）
+- 支持消息复制功能
+
+#### 2. 多种消息格式支持
+- JSON 格式：语法高亮展示，支持对象/数组折叠
+- CSV 格式：自动检测并渲染为表格
+- 纯文本：保留原始格式展示
+
+#### 3. 消费参数配置
+- 起始位置选择：Latest / Earliest / Timestamp / Offset
+- 时间选择器：支持快速选择（现在/1小时前/今天零点/昨天）
+- 消费模式：程序预览 / 保存到文件
+- 文件格式：JSON 数组 / JSON Lines / CSV
+
+#### 4. Topic 切换
+- 消费者界面可直接切换其他 Topic
+- 切换时自动停止当前消费并清空消息
+
+#### 5. 消息导出
+- 支持导出为 JSON 或 CSV 格式
+- 使用系统文件对话框选择保存位置
 
 ### 🐛 Bug 修复
+- 修复时间戳消费不生效的问题（正确实现 `offsets_for_times` 查询）
+- 修复时间选择器时区问题
+- 修复消息计数显示不及时的问题
+- 修复停止消费按钮可能无效的问题
+- 修复返回按钮在消费时不停止消费的问题
 
-- **修复桌面端空白页面问题**
-  - 问题原因：前端代码直接静态导入 Tauri API，在 Tauri 环境加载失败时导致应用崩溃
-  - 解决方案：为所有调用 Tauri 的文件添加环境检测和动态导入机制
-    - `stores/connectionStore.ts`
-    - `pages/Topics/TopicListPage.tsx`
-    - `pages/Topics/TopicDetailPage.tsx`
-    - `pages/Producer/ProducerPage.tsx`
-    - `pages/Groups/GroupListPage.tsx`
-    - `pages/Consumer/ConsumerPage.tsx`
-  - 应用现在能根据环境自动切换真实服务或 Mock 服务
-
----
-
-## [1.0.0] - 2026-03-13
-
-### 🎉 初始版本发布
-
-Kafkit 是一个跨平台的 Kafka 桌面客户端工具，为开发者和运维人员提供直观的 Kafka 集群管理能力。
-
-### ✨ 功能特性
-
-#### 连接管理
-- 支持多集群配置管理
-- 连接信息加密存储（系统密钥链 + AES-256）
-- 支持 5 种认证方式：
-  - PLAINTEXT (无认证)
-  - SASL/PLAIN
-  - SASL/SCRAM-SHA-256/512
-  - SASL/GSSAPI (Kerberos)
-  - SSL/TLS
-
-#### Topic 管理
-- Topic 列表展示（支持搜索）
-- Topic 详细信息查看（分区、副本、配置）
-- 创建 Topic
-- 删除 Topic
-
-#### 消息消费
-- 实时流式消息消费
-- 历史消息分页查看
-- 按分区消费
-- 消息格式化（JSON/文本自动检测）
-- 消息导出功能
-
-#### 消息生产
-- 单条消息发送
-- 批量消息发送（支持速率控制）
-- 支持设置 Partition 和 Key
-- 支持消息 Headers
-
-#### Consumer Group 管理
-- Consumer Group 列表
-- 消费 Lag 监控
-- Group 状态查看
-
-#### UI 特性
-- 响应式布局设计
-- 深色/浅色主题支持
-- 快捷键支持
-- 跨平台原生体验
-
-### 🔧 技术栈
-
-- **前端**: React 18 + TypeScript + Tailwind CSS
-- **后端**: Rust + Tauri 2.0
-- **Kafka 客户端**: rdkafka (librdkafka 绑定)
-
-### 📦 支持平台
-
-- macOS 11.0+ (Intel & Apple Silicon)
-- Windows 10 1809+ (x64)
-- Linux Ubuntu 20.04+ (x64)
-
-### 🧪 测试
-
-- 前端单元测试: 42 个测试全部通过
-- 后端单元测试: 13 个测试函数
-- 测试覆盖率: 核心模块 100%
+### 🔧 优化改进
+- 时间戳显示格式统一为 `yyyy-MM-dd HH:mm:ss.SSS`
+- 展开消息显示原始毫秒时间戳
+- Topic 列表页返回时不重复刷新
+- 添加更多调试日志便于排查问题
 
 ---
 
-## 版本规划
+## v1.0.1 (2025-03-19)
 
-### v1.1.0 (计划中)
-- Avro/Protobuf 格式支持
-- Schema Registry 集成
-- 消息搜索和过滤
-- 消费偏移量重置
+### 🔧 架构变更
 
-### v1.2.0 (计划中)
-- Kafka Connect 管理
-- 监控图表
-- 告警功能
-- 配置导入/导出
+#### Kafka 客户端库更换
+- **从**: `kafka` (纯 Rust 实现)
+- **到**: `rdkafka` (librdkafka 绑定)
+- **原因**: 
+  - 支持 SSL、SASL 等安全协议
+  - 提供更完整的 Kafka 协议实现
+  - 性能更好，稳定性更高
 
-### v1.3.0 (计划中)
-- 多语言支持
-- 插件系统
-- 性能优化
+**依赖变更 (Cargo.toml)**:
+```toml
+# 旧
+kafka = { version = "0.10", default-features = false, features = ["snappy"] }
+
+# 新
+rdkafka = { version = "0.36", default-features = false, features = ["cmake-build", "libz-static", "ssl-vendored"] }
+```
+
+### ✨ 新增功能
+
+#### 1. 安全认证支持
+- PLAINTEXT
+- SSL (支持 CA 证书、客户端证书、密钥)
+- SASL_PLAINTEXT (PLAIN, SCRAM-SHA-256/512, GSSAPI)
+- SASL_SSL
+
+#### 2. 国际化 (i18n)
+- 支持简体中文和英文
+- 自动检测系统语言
+- 支持手动切换语言
+- 语言设置持久化
+
+#### 3. 深色模式
+- 浅色/深色/跟随系统 三种主题
+- 使用 Tailwind CSS dark mode
+- 主题设置持久化
+
+#### 4. 新建 Topic
+- 支持指定分区数和副本因子
+- 对话框交互方式
+
+#### 5. UI 优化
+- Topic 列表加载时显示 loading 动画
+- 刷新按钮修复重复 icon 问题
+- 表格加载时显示遮罩层
+
+### 🐛 Bug 修复
+- 修复刷新按钮显示两个旋转图标的问题
+- 修复 Topic 列表加载时没有 loading 状态的问题
+- 修复新建 Topic 按钮不生效的问题
+
+### 📁 新增文件
+
+```
+src/
+├── i18n/
+│   ├── index.ts              # i18n 配置
+│   └── locales/
+│       ├── zh-CN.json        # 中文翻译
+│       └── en-US.json        # 英文翻译
+├── contexts/
+│   └── ThemeContext.tsx      # 主题上下文
+└── pages/
+    └── Settings/
+        └── SettingsPage.tsx  # 设置页面
+```
+
+### 📦 构建优化
+- 静态链接 zlib (libz-static)
+- 静态链接 OpenSSL (ssl-vendored)
+- 静态链接 librdkafka (cmake-build)
+- macOS 构建产物无需额外依赖
+
+### 🔥 Breaking Changes
+无
+
+---
+
+## v1.0.0 (2025-03-13)
+
+### 初始版本
+- Kafka 连接管理
+- Topic 列表查看
+- 基础 TCP 连接测试
+- 支持 PLAINTEXT 协议
