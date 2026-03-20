@@ -356,6 +356,8 @@ MessageItem.displayName = 'MessageItem';
 
 // 时间选择器组件
 function TimestampSelector({ value, onChange }: { value?: number; onChange: (ts: number) => void }) {
+  const { t } = useTranslation();
+  
   // 从 timestamp 计算显示值
   const getDateTimeStrings = (ts?: number) => {
     if (!ts) {
@@ -486,6 +488,8 @@ function ConsumerConfigPanel({
   config: ConsumerConfig;
   onChange: (config: ConsumerConfig) => void;
 }) {
+  const { t } = useTranslation();
+  
   if (!isOpen) return null;
 
   return (
@@ -589,21 +593,21 @@ interface ConsumerConfig {
   fileFormat: 'json' | 'csv' | 'jsonl';
 }
 
-// 消息数量限制选项
-const PREVIEW_LIMITS = [
-  { value: '100', label: t('consumer.limits.100') },
-  { value: '500', label: t('consumer.limits.500') },
-  { value: '1000', label: t('consumer.limits.1000') },
-  { value: '5000', label: t('consumer.limits.5000') },
-  { value: '10000', label: t('consumer.limits.10000') },
-  { value: 'unlimited', label: t('consumer.limits.unlimited') },
-];
-
 export function ConsumerPage() {
   const navigate = useNavigate();
   const { topic } = useParams();
   const { activeConnection } = useConnectionStore();
   const { t } = useTranslation();
+  
+  // 消息数量限制选项 - 移到组件内部
+  const PREVIEW_LIMITS = [
+    { value: '100', label: t('consumer.limits.100') },
+    { value: '500', label: t('consumer.limits.500') },
+    { value: '1000', label: t('consumer.limits.1000') },
+    { value: '5000', label: t('consumer.limits.5000') },
+    { value: '10000', label: t('consumer.limits.10000') },
+    { value: 'unlimited', label: t('consumer.limits.unlimited') },
+  ];
   
   const [messages, setMessages] = useState<KafkaMessage[]>([]);
   const [isConsuming, setIsConsuming] = useState(false);
