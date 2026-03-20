@@ -223,6 +223,7 @@
       "time": "时间"
     },
     "limits": {
+      "title": "限制",
       "100": "100 条",
       "500": "500 条",
       "1000": "1,000 条",
@@ -234,6 +235,8 @@
       "consuming": "消费中",
       "writing": "正在写入文件...",
       "written": "已写入 {count} 条到文件",
+      "writtenToFile": "已写入 {count} 条到文件",
+      "messageCount": "{count} 条消息",
       "fileMode": "文件保存模式",
       "fileModeDesc": "消息将直接保存到文件，不在程序中显示",
       "totalMessages": "共 {count} 条消息",

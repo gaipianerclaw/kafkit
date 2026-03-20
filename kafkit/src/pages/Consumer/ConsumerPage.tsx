@@ -547,7 +547,7 @@ function ConsumerConfigPanel({
               }`}
             >
               <Eye className="w-4 h-4" />
-              程序预览
+              {t('consumer.config.mode.preview')}
             </button>
             <button
               onClick={() => onChange({ ...config, mode: 'file' })}
@@ -558,7 +558,7 @@ function ConsumerConfigPanel({
               }`}
             >
               <FileText className="w-4 h-4" />
-              保存到文件
+              {t('consumer.config.mode.file')}
             </button>
           </div>
         </div>
@@ -1115,10 +1115,10 @@ export function ConsumerPage() {
             <div>
               <p className="text-xs text-muted-foreground">
                 {isConsuming && consumerConfig.mode === 'file' 
-                  ? `已写入 ${fileMessageCount} 条到文件`
-                  : `${messages.length} 条消息`
+                  ? t('consumer.status.writtenToFile', { count: fileMessageCount })
+                  : t('consumer.status.messageCount', { count: messages.length })
                 }
-                {consumerConfig.mode === 'preview' && previewLimit !== 'unlimited' && ` (限制: ${previewLimit})`}
+                {consumerConfig.mode === 'preview' && previewLimit !== 'unlimited' && ` (${t('consumer.limits.title')}: ${previewLimit})`}
               </p>
             </div>
           </div>
@@ -1176,7 +1176,7 @@ export function ConsumerPage() {
                 onChange={e => setAutoScroll(e.target.checked)}
                 className="rounded border-border"
               />
-              自动滚动
+              {t('consumer.autoScroll')}
             </label>
           )}
           
@@ -1185,20 +1185,20 @@ export function ConsumerPage() {
             <div className="relative group">
               <Button variant="outline" size="sm" disabled={messages.length === 0}>
                 <Download className="w-4 h-4 mr-1" />
-                导出
+                {t('consumer.export')}
               </Button>
               <div className="absolute top-full right-0 mt-1 w-32 bg-background border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                 <button
                   onClick={() => exportMessages('json')}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-muted first:rounded-t-lg"
                 >
-                  t('consumer.exportJson')
+                  {t('consumer.exportJson')}
                 </button>
                 <button
                   onClick={() => exportMessages('csv')}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-muted last:rounded-b-lg"
                 >
-                  t('consumer.exportCsv')
+                  {t('consumer.exportCsv')}
                 </button>
               </div>
             </div>
@@ -1207,14 +1207,14 @@ export function ConsumerPage() {
           {consumerConfig.mode === 'preview' && (
             <Button variant="outline" size="sm" onClick={clearMessages}>
               <Trash2 className="w-4 h-4 mr-1" />
-              清空
+              {t('consumer.clear')}
             </Button>
           )}
           
           {isConsuming ? (
             <Button variant="destructive" size="sm" onClick={stopConsumption}>
               <Pause className="w-4 h-4 mr-1" />
-              停止
+              {t('consumer.stop')}
             </Button>
           ) : (
             <Button size="sm" onClick={startConsumption}>
@@ -1288,7 +1288,7 @@ export function ConsumerPage() {
             <div className="text-center">
               <p className="text-lg font-medium text-foreground mb-2">{t('consumer.status.fileMode')}</p>
               <p className="text-sm">{t('consumer.status.fileModeDesc')}</p>
-              <p className="text-xs mt-2">格式: {consumerConfig.fileFormat.toUpperCase()}</p>
+              <p className="text-xs mt-2">{t('consumer.config.fileFormat')}: {consumerConfig.fileFormat.toUpperCase()}</p>
             </div>
           )}
         </div>

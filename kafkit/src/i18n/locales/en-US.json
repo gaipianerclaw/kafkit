@@ -223,6 +223,7 @@
       "time": "Time"
     },
     "limits": {
+      "title": "Limit",
       "100": "100 messages",
       "500": "500 messages",
       "1000": "1,000 messages",
@@ -234,6 +235,8 @@
       "consuming": "Consuming",
       "writing": "Writing to file...",
       "written": "Written {count} messages to file",
+      "writtenToFile": "Written {count} messages to file",
+      "messageCount": "{count} messages",
       "fileMode": "File Save Mode",
       "fileModeDesc": "Messages will be saved directly to file, not displayed in app",
       "totalMessages": "{count} messages total",
