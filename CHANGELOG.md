@@ -1,5 +1,22 @@
 # 更新日志
 
+## v1.0.10 (2026-03-20)
+
+### 🐛 Bug 修复
+
+#### Consumer Group 功能临时禁用
+- **问题**: rdkafka 0.36 的 `fetch_group_list` API 存在内存安全问题，导致程序闪退
+- **临时解决**: 禁用消费组功能，返回空列表避免崩溃
+- **错误信息**: `unsafe precondition(s) violated: slice::from_raw_parts requires the pointer to be aligned and non-null`
+- **后续计划**: 等待 rdkafka 更新或使用更低级的 Kafka API 重新实现
+
+### 已知问题
+- 消费组列表显示为空（功能已禁用）
+- 消费延迟(Lag)查看不可用
+- Offset 重置功能不可用
+
+---
+
 ## v1.0.9 (2026-03-20)
 
 ### 🐛 Bug 修复
