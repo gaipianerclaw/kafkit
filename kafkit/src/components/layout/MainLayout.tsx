@@ -1,6 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
-  Database, 
   List, 
   Users, 
   Settings, 
@@ -30,7 +29,7 @@ export function MainLayout() {
       <aside className="w-64 h-screen border-r border-border bg-card flex flex-col flex-shrink-0 overflow-hidden">
         {/* Logo */}
         <div className="h-14 flex items-center px-4 border-b border-border">
-          <Database className="w-6 h-6 text-primary mr-2" />
+          <img src="/logo.png" alt="Kafkit" className="w-8 h-8 mr-2 rounded-lg" />
           <span className="font-semibold text-lg">Kafkit</span>
         </div>
 
