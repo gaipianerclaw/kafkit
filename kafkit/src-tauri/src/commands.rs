@@ -165,12 +165,27 @@ pub async fn create_topic(
     name: String,
     num_partitions: i32,
     replication_factor: i32,
-    configs: Option<std::collections::HashMap<String, String>>,
+    _configs: Option<std::collections::HashMap<String, String>>,
     state: State<'_, AppState>,
 ) -> Result<()> {
     println!("[Kafkit] Creating topic: {} with {} partitions", name, num_partitions);
-    // TODO: 实现真实的 Topic 创建
-    Ok(())
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 创建 topic
+    state.connection_manager.create_topic(
+        &connection,
+        &name,
+        num_partitions,
+        replication_factor,
+    ).await
 }
 
 #[tauri::command]
@@ -180,8 +195,18 @@ pub async fn delete_topic(
     state: State<'_, AppState>,
 ) -> Result<()> {
     println!("[Kafkit] Deleting topic: {}", topic);
-    // TODO: 实现真实的 Topic 删除
-    Ok(())
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 删除 topic
+    state.connection_manager.delete_topic(&connection, &topic).await
 }
 
 #[tauri::command]

@@ -12,6 +12,8 @@ use rdkafka::consumer::StreamConsumer;
 use rdkafka::Message as KafkaMessageTrait;
 use rdkafka::topic_partition_list::TopicPartitionList;
 use rdkafka::Offset as KafkaOffset;
+use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+use rdkafka::client::DefaultClientContext;
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
@@ -442,6 +444,101 @@ impl ConnectionManager {
             partitions,
             configs: vec![], // TODO: 使用 AdminClient 获取 topic 配置
         })
+    }
+
+    /// 创建 Topic
+    pub async fn create_topic(
+        &self,
+        connection: &Connection,
+        name: &str,
+        num_partitions: i32,
+        replication_factor: i32,
+    ) -> Result<(), AppError> {
+        println!(
+            "[Kafkit] Creating topic: {} with {} partitions, replication factor: {}",
+            name, num_partitions, replication_factor
+        );
+
+        // 创建 AdminClient 配置
+        let config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 创建 NewTopic
+        let new_topic = NewTopic::new(
+            name,
+            num_partitions,
+            TopicReplication::Fixed(replication_factor),
+        );
+
+        // 创建 topic
+        let opts = AdminOptions::new();
+        let results = admin.create_topics(&[new_topic], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to create topic: {}", e)))?;
+
+        // 检查结果
+        for result in results {
+            match result {
+                Ok(topic) => {
+                    println!("[Kafkit] Successfully created topic: {}", topic);
+                }
+                Err((topic, err)) => {
+                    let msg = format!("Failed to create topic {}: {}", topic, err);
+                    println!("[Kafkit] {}", msg);
+                    return Err(AppError::KafkaError(msg));
+                }
+            }
+        }
+
+        println!("[Kafkit] Topic '{}' created successfully", name);
+        Ok(())
+    }
+
+    /// 删除 Topic
+    pub async fn delete_topic(
+        &self,
+        connection: &Connection,
+        name: &str,
+    ) -> Result<(), AppError> {
+        println!("[Kafkit] Deleting topic: {}", name);
+
+        // 创建 AdminClient 配置
+        let config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 删除 topic
+        let opts = AdminOptions::new();
+        let results = admin.delete_topics(&[name], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to delete topic: {}", e)))?;
+
+        // 检查结果
+        for result in results {
+            match result {
+                Ok(topic) => {
+                    println!("[Kafkit] Successfully deleted topic: {}", topic);
+                }
+                Err((topic, err)) => {
+                    // 忽略 UnknownTopicOrPartition 错误（topic 不存在）
+                    if err.to_string().contains("UnknownTopicOrPartition") {
+                        println!("[Kafkit] Topic {} does not exist, treating as success", topic);
+                    } else {
+                        let msg = format!("Failed to delete topic {}: {}", topic, err);
+                        println!("[Kafkit] {}", msg);
+                        return Err(AppError::KafkaError(msg));
+                    }
+                }
+            }
+        }
+
+        println!("[Kafkit] Topic '{}' deleted successfully", name);
+        Ok(())
     }
 
     /// 发送消息
