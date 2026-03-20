@@ -86,6 +86,11 @@ jobs:
             wget \
             file \
             libxdo3
+          # 设置 pkg-config 路径
+          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          # 验证安装
+          pkg-config --exists libcurl && echo "libcurl found" || echo "libcurl NOT found"
+          pkg-config --exists libsasl2 && echo "libsasl2 found" || echo "libsasl2 NOT found"
 
       - name: Install dependencies (Windows)
         if: matrix.platform == 'windows-latest'
@@ -100,6 +105,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # rdkafka 配置
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
+          RDKAFKA_USE_PKG_CONFIG: "1"
         with:
           projectPath: kafkit
           args: ${{ matrix.args }}
