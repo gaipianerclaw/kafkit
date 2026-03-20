@@ -271,12 +271,18 @@ pub async fn produce_message(
     state: State<'_, AppState>,
 ) -> Result<ProduceResult> {
     println!("[Kafkit] Producing message to topic: {}", topic);
-    // TODO: 实现真实的消息发送
-    Ok(ProduceResult {
-        partition: message.partition.unwrap_or(0),
-        offset: chrono::Utc::now().timestamp(),
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    })
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 发送消息
+    state.connection_manager.produce_message(&connection, &topic, message).await
 }
 
 #[tauri::command]
@@ -288,12 +294,18 @@ pub async fn produce_batch(
     state: State<'_, AppState>,
 ) -> Result<BatchProduceResult> {
     println!("[Kafkit] Producing {} messages to topic: {}", messages.len(), topic);
-    // TODO: 实现真实的批量发送
-    Ok(BatchProduceResult {
-        success: messages.len() as i32,
-        failed: 0,
-        errors: vec![],
-    })
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 批量发送消息
+    state.connection_manager.produce_batch(&connection, &topic, messages, Some(options)).await
 }
 
 #[tauri::command]

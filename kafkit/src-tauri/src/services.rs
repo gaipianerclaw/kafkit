@@ -1,4 +1,5 @@
 use crate::models::*;
+use crate::models::BatchProduceError;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -14,16 +15,20 @@ use rdkafka::topic_partition_list::TopicPartitionList;
 use rdkafka::Offset as KafkaOffset;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::client::DefaultClientContext;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::Timeout;
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
     clients: Mutex<HashMap<String, BaseConsumer>>,
+    producers: Mutex<HashMap<String, FutureProducer>>,
 }
 
 impl ConnectionManager {
     pub fn new() -> Self {
         Self {
             clients: Mutex::new(HashMap::new()),
+            producers: Mutex::new(HashMap::new()),
         }
     }
 
@@ -541,26 +546,147 @@ impl ConnectionManager {
         Ok(())
     }
 
+    /// 获取或创建 Producer
+    async fn get_producer(&self, connection: &Connection) -> Result<FutureProducer, AppError> {
+        let mut producers = self.producers.lock().await;
+        
+        // 检查是否已有缓存的 producer
+        if let Some(producer) = producers.get(&connection.id) {
+            println!("[Kafkit] Using cached producer for connection: {}", connection.id);
+            return Ok(producer.clone());
+        }
+
+        // 创建新的 Producer
+        println!("[Kafkit] Creating new Kafka producer for: {}", connection.bootstrap_servers.join(","));
+        let config = Self::create_client_config(connection)?;
+        
+        // Producer 特定配置
+        let mut producer_config = config;
+        producer_config.set("acks", "all");
+        producer_config.set("retries", "3");
+        producer_config.set("max.in.flight.requests.per.connection", "5");
+        producer_config.set("compression.type", "snappy");
+        
+        let producer: FutureProducer = producer_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create producer: {}", e)))?;
+        
+        println!("[Kafkit] Producer created successfully");
+        producers.insert(connection.id.clone(), producer.clone());
+        
+        Ok(producer)
+    }
+
     /// 发送消息
     pub async fn produce_message(
         &self, 
-        _connection: &Connection, 
+        connection: &Connection, 
         topic: &str, 
         message: ProduceMessage
     ) -> Result<ProduceResult, AppError> {
         println!("[Kafkit] Producing message to topic: {}", topic);
         
-        // TODO: 使用 Producer 实现真实的发送
-        Ok(ProduceResult {
-            partition: message.partition.unwrap_or(0),
-            offset: chrono::Utc::now().timestamp(),
-            timestamp: chrono::Utc::now().timestamp_millis(),
+        let producer = self.get_producer(connection).await?;
+        
+        // 创建消息记录
+        let mut record = FutureRecord::to(topic);
+        
+        // 设置消息内容
+        record = record.payload(&message.value);
+        
+        // 设置 key（如果有）
+        if let Some(key) = &message.key {
+            record = record.key(key.as_bytes());
+        }
+        
+        // 设置 partition（如果有）
+        if let Some(partition) = message.partition {
+            record = record.partition(partition);
+        }
+        
+        // 发送消息
+        let delivery = producer.send(
+            record,
+            Timeout::After(Duration::from_secs(10))
+        ).await;
+        
+        match delivery {
+            Ok((partition, offset)) => {
+                println!("[Kafkit] Message sent successfully to partition {} at offset {}", partition, offset);
+                Ok(ProduceResult {
+                    partition,
+                    offset,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                })
+            }
+            Err((e, _)) => {
+                let error_msg = format!("Failed to send message: {}", e);
+                println!("[Kafkit] {}", error_msg);
+                Err(AppError::KafkaError(error_msg))
+            }
+        }
+    }
+
+    /// 批量发送消息
+    pub async fn produce_batch(
+        &self,
+        connection: &Connection,
+        topic: &str,
+        messages: Vec<ProduceMessage>,
+        _options: Option<BatchProduceOptions>,
+    ) -> Result<BatchProduceResult, AppError> {
+        println!("[Kafkit] Producing {} messages to topic: {}", messages.len(), topic);
+        
+        let producer = self.get_producer(connection).await?;
+        
+        let mut success = 0i32;
+        let mut failed = 0i32;
+        let mut errors: Vec<BatchProduceError> = vec![];
+        
+        for (i, message) in messages.iter().enumerate() {
+            // 创建消息记录
+            let mut record = FutureRecord::to(topic);
+            record = record.payload(&message.value);
+            
+            if let Some(key) = &message.key {
+                record = record.key(key.as_bytes());
+            }
+            
+            if let Some(partition) = message.partition {
+                record = record.partition(partition);
+            }
+            
+            // 发送消息
+            match producer.send(record, Timeout::After(Duration::from_secs(10))).await {
+                Ok((partition, offset)) => {
+                    println!("[Kafkit] Message {} sent to partition {} at offset {}", i, partition, offset);
+                    success += 1;
+                }
+                Err((e, _)) => {
+                    let error_msg = format!("Message {} failed: {}", i, e);
+                    println!("[Kafkit] {}", error_msg);
+                    failed += 1;
+                    errors.push(BatchProduceError {
+                        index: i as i32,
+                        error: error_msg,
+                    });
+                }
+            }
+        }
+        
+        println!("[Kafkit] Batch produce complete: {} success, {} failed", success, failed);
+        
+        Ok(BatchProduceResult {
+            success,
+            failed,
+            errors,
         })
     }
 
     pub async fn close_connection(&self, connection_id: &str) {
         let mut clients = self.clients.lock().await;
         clients.remove(connection_id);
+        let mut producers = self.producers.lock().await;
+        producers.remove(connection_id);
         println!("[Kafkit] Closed connection: {}", connection_id);
     }
 }

@@ -1,5 +1,28 @@
 # 更新日志
 
+## v1.0.7 (2026-03-20)
+
+### ✨ 新增功能
+
+#### 消息生产功能实现
+- **真实消息发送**: 使用 rdkafka FutureProducer 实现真正的 Kafka 消息发送
+- **单条发送**: 支持指定 partition 和 key，可发送文本/JSON/CSV 格式
+- **批量发送**: 支持每行一条消息批量发送，自动处理发送失败
+- **定时发送**: 新增定时发送模式，支持配置：
+  - 批次大小：每次发送的消息数量
+  - 发送间隔：毫秒级控制发送频率
+  - 重复次数：自动重复发送多轮
+  - 实时进度条：显示发送进度和统计信息
+- **Producer 连接池**: 缓存 producer 连接，提高发送性能
+
+### 🔧 技术改进
+- 添加 Producer 连接池管理（`producers: Mutex<HashMap<String, FutureProducer>>`）
+- 实现 `get_producer`、`produce_message`、`produce_batch` 方法
+- 更新 commands.rs 调用真实实现
+- 更新前端 ProducerPage，添加三种发送模式
+
+---
+
 ## v1.0.6 (2026-03-20)
 
 ### ✨ 功能增强
