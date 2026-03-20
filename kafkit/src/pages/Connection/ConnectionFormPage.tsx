@@ -6,14 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
 import type { ConnectionConfig, AuthConfig, SecurityConfig } from '../../types';
-
-const authTypeOptions = [
-  { value: 'none', label: '无认证 (PLAINTEXT)' },
-  { value: 'saslPlain', label: 'SASL/PLAIN' },
-  { value: 'saslScram', label: 'SASL/SCRAM' },
-  { value: 'saslGssapi', label: 'SASL/GSSAPI (Kerberos)' },
-  { value: 'ssl', label: 'SSL/TLS' },
-];
+import { useTranslation } from 'react-i18next';
 
 const protocolOptions = [
   { value: 'PLAINTEXT', label: 'PLAINTEXT' },
@@ -31,6 +24,7 @@ export function ConnectionFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const { t } = useTranslation();
   
   const { createConnection, updateConnection, testConnection } = useConnectionStore();
   
@@ -58,11 +52,11 @@ export function ConnectionFormPage() {
   const loadConnection = async (_connId: string) => {
     try {
       // 这里应该从 API 获取，暂时使用简化方式
-      alert('编辑功能需要在桌面端运行');
+      alert(t('connections.alerts.editOnlyInDesktop'));
       navigate('/main/connections');
       // setFormData...
     } catch (error) {
-      alert('加载连接失败');
+      alert(t('connections.alerts.loadFailed'));
       navigate('/main/connections');
     } finally {
       setLoading(false);
@@ -81,7 +75,7 @@ export function ConnectionFormPage() {
     } catch (error) {
       setTestResult({
         success: false,
-        message: error instanceof Error ? error.message : '测试失败',
+        message: error instanceof Error ? error.message : t('connections.alerts.testFailed'),
       });
     } finally {
       setTesting(false);
@@ -107,7 +101,7 @@ export function ConnectionFormPage() {
       navigate('/main/connections');
     } catch (error) {
       console.error('[Kafkit] Save failed:', error);
-      alert('保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
+      alert(t('connections.alerts.saveFailed') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
     } finally {
       setSaving(false);
     }
@@ -131,13 +125,13 @@ export function ConnectionFormPage() {
         return (
           <>
             <Input
-              label="用户名"
+              label={t('connections.form.username')}
               value={(auth as { username?: string }).username || ''}
               onChange={e => updateAuth({ username: e.target.value })}
               placeholder="username"
             />
             <Input
-              label="密码"
+              label={t('connections.form.password')}
               type="password"
               value={(auth as { password?: string }).password || ''}
               onChange={e => updateAuth({ password: e.target.value })}
@@ -150,19 +144,19 @@ export function ConnectionFormPage() {
         return (
           <>
             <Select
-              label="SCRAM 机制"
+              label={t('connections.form.scramMechanism')}
               value={(auth as { mechanism?: string }).mechanism || 'SCRAM-SHA-256'}
               onChange={e => updateAuth({ mechanism: e.target.value as 'SCRAM-SHA-256' | 'SCRAM-SHA-512' })}
               options={scramMechanismOptions}
             />
             <Input
-              label="用户名"
+              label={t('connections.form.username')}
               value={(auth as { username?: string }).username || ''}
               onChange={e => updateAuth({ username: e.target.value })}
               placeholder="username"
             />
             <Input
-              label="密码"
+              label={t('connections.form.password')}
               type="password"
               value={(auth as { password?: string }).password || ''}
               onChange={e => updateAuth({ password: e.target.value })}
@@ -181,7 +175,7 @@ export function ConnectionFormPage() {
               placeholder="kafka/user@EXAMPLE.COM"
             />
             <Input
-              label="Keytab 路径 (可选)"
+              label={t('connections.form.keytabPath')}
               value={(auth as { keytabPath?: string }).keytabPath || ''}
               onChange={e => updateAuth({ keytabPath: e.target.value })}
               placeholder="/path/to/keytab"
@@ -199,19 +193,19 @@ export function ConnectionFormPage() {
         return (
           <>
             <Input
-              label="CA 证书路径 (可选)"
+              label={t('connections.form.caCert')}
               value={(auth as { caCert?: string }).caCert || ''}
               onChange={e => updateAuth({ caCert: e.target.value })}
               placeholder="/path/to/ca.crt"
             />
             <Input
-              label="客户端证书路径 (可选)"
+              label={t('connections.form.clientCert')}
               value={(auth as { clientCert?: string }).clientCert || ''}
               onChange={e => updateAuth({ clientCert: e.target.value })}
               placeholder="/path/to/client.crt"
             />
             <Input
-              label="客户端密钥路径 (可选)"
+              label={t('connections.form.clientKey')}
               value={(auth as { clientKey?: string }).clientKey || ''}
               onChange={e => updateAuth({ clientKey: e.target.value })}
               placeholder="/path/to/client.key"
@@ -224,8 +218,17 @@ export function ConnectionFormPage() {
     }
   };
 
+  // Build auth type options with translations
+  const authTypeOptions = [
+    { value: 'none', label: t('connections.authTypes.none') },
+    { value: 'saslPlain', label: 'SASL/PLAIN' },
+    { value: 'saslScram', label: 'SASL/SCRAM' },
+    { value: 'saslGssapi', label: 'SASL/GSSAPI (Kerberos)' },
+    { value: 'ssl', label: 'SSL/TLS' },
+  ];
+
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center">加载中...</div>;
+    return <div className="flex-1 flex items-center justify-center">{t('common.loading')}</div>;
   }
 
   return (
@@ -237,8 +240,8 @@ export function ConnectionFormPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{isEdit ? '编辑连接' : '新建连接'}</h1>
-            <p className="text-sm text-muted-foreground">配置 Kafka 集群连接</p>
+            <h1 className="text-2xl font-bold">{isEdit ? t('connections.edit') : t('connections.new')}</h1>
+            <p className="text-sm text-muted-foreground">{t('connections.manageDesc')}</p>
           </div>
         </div>
 
@@ -247,7 +250,7 @@ export function ConnectionFormPage() {
           {/* Basic Info */}
           <div className="bg-card border border-border rounded-lg p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium">基本信息</h2>
+              <h2 className="text-lg font-medium">{t('connections.form.basicInfo')}</h2>
               <button
                 type="button"
                 onClick={() => {
@@ -261,36 +264,36 @@ export function ConnectionFormPage() {
                 }}
                 className="text-xs text-primary hover:underline"
               >
-                填入测试配置
+                {t('connections.form.fillTestConfig')}
               </button>
             </div>
             
             <Input
-              label="连接名称"
+              label={t('connections.name')}
               required
               value={formData.name}
               onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Production Cluster"
+              placeholder={t('connections.form.namePlaceholder')}
             />
 
             <Input
-              label="Bootstrap Servers"
+              label={t('connections.bootstrapServers')}
               required
               value={formData.bootstrapServers}
               onChange={e => setFormData(prev => ({ ...prev, bootstrapServers: e.target.value }))}
-              placeholder="localhost:9092,localhost:9093"
+              placeholder={t('connections.form.serversPlaceholder')}
             />
             <p className="text-xs text-muted-foreground">
-              多个地址用逗号分隔，格式：host:port (例如: ec2-dmz-kafka-01:9092)
+              {t('connections.form.serversHint')}
             </p>
           </div>
 
           {/* Security */}
           <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-            <h2 className="text-lg font-medium mb-4">安全设置</h2>
+            <h2 className="text-lg font-medium mb-4">{t('connections.form.security')}</h2>
 
             <Select
-              label="安全协议"
+              label={t('connections.protocol')}
               value={formData.security.protocol}
               onChange={e => setFormData(prev => ({
                 ...prev,
@@ -300,7 +303,7 @@ export function ConnectionFormPage() {
             />
 
             <Select
-              label="认证方式"
+              label={t('connections.authType')}
               value={formData.auth.type}
               onChange={e => {
                 const authType = e.target.value;
@@ -340,7 +343,7 @@ export function ConnectionFormPage() {
                 <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               )}
               <div>
-                <p className="font-medium">{testResult.success ? '连接成功' : '连接失败'}</p>
+                <p className="font-medium">{testResult.success ? t('connections.testSuccess') : t('connections.testFailed')}</p>
                 <p className="text-sm mt-1">{testResult.message}</p>
               </div>
             </div>
@@ -349,14 +352,14 @@ export function ConnectionFormPage() {
           {/* Actions */}
           <div className="flex gap-3">
             <Button type="button" variant="outline" onClick={handleTest} isLoading={testing}>
-              测试连接
+              {t('connections.test')}
             </Button>
             <div className="flex-1" />
             <Button type="button" variant="outline" onClick={() => navigate('/main/connections')}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button type="submit" isLoading={saving}>
-              {isEdit ? '保存' : '创建'}
+              {isEdit ? t('common.save') : t('common.create')}
             </Button>
           </div>
         </form>

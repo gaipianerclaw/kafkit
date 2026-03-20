@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
+import { useTranslation } from 'react-i18next';
 
 // 检测是否在 Tauri 环境中
 const isTauri = () => {
@@ -24,6 +25,7 @@ export function ProducerPage() {
   const navigate = useNavigate();
   const { topic } = useParams();
   const { activeConnection } = useConnectionStore();
+  const { t } = useTranslation();
   
   const [mode, setMode] = useState<'single' | 'batch' | 'scheduled'>('single');
   const [partition, setPartition] = useState('');
@@ -58,12 +60,12 @@ export function ProducerPage() {
         key: key || undefined,
         value: value.trim(),
       });
-      setResult({ success: true, message: '消息发送成功' });
+      setResult({ success: true, message: t('producer.success') });
       setValue('');
     } catch (err) {
       setResult({
         success: false,
-        message: '发送失败: ' + (err instanceof Error ? err.message : '未知错误'),
+        message: t('producer.failed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')),
       });
     } finally {
       setSending(false);
@@ -93,19 +95,19 @@ export function ProducerPage() {
       );
 
       if (batchResult.failed === 0) {
-        setResult({ success: true, message: `成功发送 ${batchResult.success} 条消息` });
+        setResult({ success: true, message: t('producer.batchSuccess', { count: batchResult.success }) });
         setBatchValue('');
       } else {
         const errorDetails = batchResult.errors.slice(0, 3).map(e => e.error).join('; ');
         setResult({ 
           success: false, 
-          message: `发送完成: ${batchResult.success} 成功, ${batchResult.failed} 失败. ${errorDetails}` 
+          message: t('producer.batchComplete', { success: batchResult.success, failed: batchResult.failed }) + '. ' + errorDetails
         });
       }
     } catch (err) {
       setResult({
         success: false,
-        message: '发送失败: ' + (err instanceof Error ? err.message : '未知错误'),
+        message: t('producer.failed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')),
       });
     } finally {
       setSending(false);
@@ -164,7 +166,7 @@ export function ProducerPage() {
 
         setResult({
           success: failedCount === 0,
-          message: `进度: ${currentCount}/${totalMessages} | 成功: ${successCount} | 失败: ${failedCount}`
+          message: t('producer.scheduledProgress', { current: currentCount, total: totalMessages, success: successCount, failed: failedCount })
         });
 
         // 如果还有更多消息要发送
@@ -174,13 +176,13 @@ export function ProducerPage() {
           setIsScheduledRunning(false);
           setResult({
             success: failedCount === 0,
-            message: `发送完成! 总计: ${currentCount} | 成功: ${successCount} | 失败: ${failedCount}`
+            message: t('producer.scheduledComplete', { total: currentCount, success: successCount, failed: failedCount })
           });
         }
       } catch (err) {
         setResult({
           success: false,
-          message: '发送失败: ' + (err instanceof Error ? err.message : '未知错误'),
+          message: t('producer.failed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')),
         });
         setIsScheduledRunning(false);
       }
@@ -254,7 +256,7 @@ export function ProducerPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate('/main/topics')} className="mr-2">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <h1 className="text-lg font-semibold">发送消息: {decodedTopic}</h1>
+          <h1 className="text-lg font-semibold">{t('producer.title')}: {decodedTopic}</h1>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-muted rounded-lg p-1">
@@ -267,7 +269,7 @@ export function ProducerPage() {
                 mode === 'single' ? 'bg-background shadow-sm' : 'text-muted-foreground'
               }`}
             >
-              单条
+              {t('producer.singleMode')}
             </button>
             <button
               onClick={() => {
@@ -278,7 +280,7 @@ export function ProducerPage() {
                 mode === 'batch' ? 'bg-background shadow-sm' : 'text-muted-foreground'
               }`}
             >
-              批量
+              {t('producer.batchMode')}
             </button>
             <button
               onClick={() => {
@@ -289,7 +291,7 @@ export function ProducerPage() {
               }`}
             >
               <Clock className="w-3 h-3" />
-              定时
+              {t('producer.scheduledMode')}
             </button>
           </div>
         </div>
@@ -301,23 +303,23 @@ export function ProducerPage() {
           {/* Format & Tools */}
           <div className="flex items-center gap-4">
             <Select
-              label="消息格式"
+              label={t('producer.format')}
               value={format}
               onChange={e => setFormat(e.target.value as typeof format)}
               options={[
-                { value: 'text', label: '纯文本' },
-                { value: 'json', label: 'JSON' },
-                { value: 'csv', label: 'CSV' },
+                { value: 'text', label: t('producer.formats.text') },
+                { value: 'json', label: t('producer.formats.json') },
+                { value: 'csv', label: t('producer.formats.csv') },
               ]}
             />
             <div className="flex-1" />
             <Button variant="outline" size="sm" onClick={loadExample}>
-              加载示例
+              {t('producer.loadExample')}
             </Button>
             {format === 'json' && (
               <Button variant="outline" size="sm" onClick={formatJson}>
                 <FileJson className="w-4 h-4 mr-2" />
-                格式化
+                {t('producer.formatJson')}
               </Button>
             )}
           </div>
@@ -326,17 +328,17 @@ export function ProducerPage() {
           {mode === 'single' && (
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Partition (可选)"
+                label={t('producer.partition')}
                 type="number"
                 value={partition}
                 onChange={e => setPartition(e.target.value)}
-                placeholder="自动分配"
+                placeholder={t('producer.partitionPlaceholder')}
               />
               <Input
-                label="Key (可选)"
+                label={t('producer.key')}
                 value={key}
                 onChange={e => setKey(e.target.value)}
-                placeholder="message key"
+                placeholder={t('producer.keyPlaceholder')}
               />
             </div>
           )}
@@ -345,21 +347,21 @@ export function ProducerPage() {
           {(mode === 'batch' || mode === 'scheduled') && (
             <div className="grid grid-cols-3 gap-4">
               <Input
-                label="Partition (可选)"
+                label={t('producer.partition')}
                 type="number"
                 value={partition}
                 onChange={e => setPartition(e.target.value)}
-                placeholder="自动分配"
+                placeholder={t('producer.partitionPlaceholder')}
               />
               <Input
-                label="Key (可选)"
+                label={t('producer.key')}
                 value={key}
                 onChange={e => setKey(e.target.value)}
-                placeholder="message key"
+                placeholder={t('producer.keyPlaceholder')}
               />
               {mode === 'scheduled' && (
                 <Input
-                  label="批次大小"
+                  label={t('producer.batchSize')}
                   type="number"
                   min={1}
                   max={100}
@@ -374,7 +376,7 @@ export function ProducerPage() {
           {mode === 'scheduled' && (
             <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-lg">
               <div>
-                <label className="block text-sm font-medium mb-1">发送间隔 (毫秒)</label>
+                <label className="block text-sm font-medium mb-1">{t('producer.interval')}</label>
                 <input
                   type="number"
                   min={100}
@@ -384,10 +386,10 @@ export function ProducerPage() {
                   disabled={isScheduledRunning}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-1">建议: 100-5000ms</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('producer.intervalHint')}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">重复次数</label>
+                <label className="block text-sm font-medium mb-1">{t('producer.repeatCount')}</label>
                 <input
                   type="number"
                   min={1}
@@ -397,7 +399,7 @@ export function ProducerPage() {
                   disabled={isScheduledRunning}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-1">总消息数 = 行数 × 重复次数</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('producer.repeatHint')}</p>
               </div>
             </div>
           )}
@@ -405,14 +407,14 @@ export function ProducerPage() {
           {/* Message Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              {mode === 'single' ? '消息内容' : '消息内容（每行一条消息）'}
+              {mode === 'single' ? t('producer.contentSingle') : t('producer.contentBatch')}
             </label>
             <textarea
               value={mode === 'single' ? value : batchValue}
               onChange={e => mode === 'single' ? setValue(e.target.value) : setBatchValue(e.target.value)}
               disabled={isScheduledRunning}
               className="w-full h-64 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              placeholder={mode === 'single' ? '输入消息内容...' : '每行输入一条消息，将按顺序发送...'}
+              placeholder={mode === 'single' ? t('producer.placeholderSingle') : t('producer.placeholderBatch')}
             />
           </div>
 
@@ -420,7 +422,7 @@ export function ProducerPage() {
           {mode === 'scheduled' && isScheduledRunning && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>发送进度</span>
+                <span>{t('producer.progress')}</span>
                 <span>{sentCount} / {batchValue.split('\n').filter(line => line.trim()).length * repeatCount}</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
@@ -453,7 +455,7 @@ export function ProducerPage() {
                 disabled={!value.trim()}
               >
                 <Send className="w-4 h-4 mr-2" />
-                发送
+                {t('producer.send')}
               </Button>
             )}
             {mode === 'batch' && (
@@ -464,7 +466,7 @@ export function ProducerPage() {
                 disabled={!batchValue.trim()}
               >
                 <Send className="w-4 h-4 mr-2" />
-                批量发送
+                {t('producer.sendBatch')}
               </Button>
             )}
             {mode === 'scheduled' && (
@@ -476,7 +478,7 @@ export function ProducerPage() {
                     onClick={stopScheduled}
                   >
                     <Square className="w-4 h-4 mr-2" />
-                    停止发送
+                    {t('producer.stop')}
                   </Button>
                 ) : (
                   <Button 
@@ -485,7 +487,7 @@ export function ProducerPage() {
                     disabled={!batchValue.trim()}
                   >
                     <Play className="w-4 h-4 mr-2" />
-                    开始定时发送
+                    {t('producer.startScheduled')}
                   </Button>
                 )}
               </>

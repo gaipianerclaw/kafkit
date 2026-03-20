@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
 import type { KafkaMessage, TopicDetail, OffsetSpec } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // Tauri dialog API
 const getTauriDialog = async () => {
@@ -404,15 +405,15 @@ function TimestampSelector({ value, onChange }: { value?: number; onChange: (ts:
   };
   
   const quickSelects = [
-    { label: '现在', getTime: () => Date.now() },
-    { label: '1小时前', getTime: () => Date.now() - 3600000 },
-    { label: '今天零点', getTime: () => new Date().setHours(0, 0, 0, 0) },
-    { label: '昨天', getTime: () => new Date(Date.now() - 86400000).setHours(0, 0, 0, 0) },
+    { label: t('consumer.timeSelector.now'), getTime: () => Date.now() },
+    { label: t('consumer.timeSelector.hourAgo'), getTime: () => Date.now() - 3600000 },
+    { label: t('consumer.timeSelector.todayMidnight'), getTime: () => new Date().setHours(0, 0, 0, 0) },
+    { label: t('consumer.timeSelector.yesterday'), getTime: () => new Date(Date.now() - 86400000).setHours(0, 0, 0, 0) },
   ];
   
   return (
     <div className="space-y-3">
-      <label className="text-sm text-muted-foreground block">时间戳</label>
+      <label className="text-sm text-muted-foreground block">{t('consumer.timeSelector.label')}</label>
       
       {/* 快速选择按钮 */}
       <div className="flex flex-wrap gap-2">
@@ -434,7 +435,7 @@ function TimestampSelector({ value, onChange }: { value?: number; onChange: (ts:
       {/* 日期时间输入 */}
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="text-xs text-muted-foreground block mb-1.5">日期</label>
+          <label className="text-xs text-muted-foreground block mb-1.5">{t('consumer.timeSelector.date')}</label>
           <input
             type="date"
             value={dateStr}
@@ -443,7 +444,7 @@ function TimestampSelector({ value, onChange }: { value?: number; onChange: (ts:
           />
         </div>
         <div className="w-32">
-          <label className="text-xs text-muted-foreground block mb-1.5">时间</label>
+          <label className="text-xs text-muted-foreground block mb-1.5">{t('consumer.timeSelector.time')}</label>
           <input
             type="time"
             value={timeStr}
@@ -490,21 +491,21 @@ function ConsumerConfigPanel({
   return (
     <div className="absolute top-full right-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50 p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-medium">消费参数配置</h3>
+        <h3 className="font-medium">{t('consumer.config.title')}</h3>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">×</button>
       </div>
       
       <div className="space-y-4">
         <div>
-          <label className="text-sm text-muted-foreground block mb-1">起始位置</label>
+          <label className="text-sm text-muted-foreground block mb-1">{t('consumer.config.startPosition')}</label>
           <Select
             value={config.offsetType}
             onChange={e => onChange({ ...config, offsetType: e.target.value as OffsetType })}
             options={[
-              { value: 'latest', label: 'Latest (最新消息)' },
-              { value: 'earliest', label: 'Earliest (最早消息)' },
-              { value: 'timestamp', label: 'Timestamp (指定时间)' },
-              { value: 'offset', label: 'Offset (指定偏移量)' },
+              { value: 'latest', label: t('consumer.config.positions.latest') },
+              { value: 'earliest', label: t('consumer.config.positions.earliest') },
+              { value: 'timestamp', label: t('consumer.config.positions.timestamp') },
+              { value: 'offset', label: t('consumer.config.positions.offset') },
             ]}
             className="w-full"
           />
@@ -519,19 +520,19 @@ function ConsumerConfigPanel({
         
         {config.offsetType === 'offset' && (
           <div>
-            <label className="text-sm text-muted-foreground block mb-1">偏移量</label>
+            <label className="text-sm text-muted-foreground block mb-1">{t('consumer.config.offset')}</label>
             <input
               type="number"
               value={config.offsetValue || 0}
               onChange={e => onChange({ ...config, offsetValue: parseInt(e.target.value) || 0 })}
               className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
-              placeholder="输入 offset 数值"
+              placeholder={t('consumer.config.offsetPlaceholder')}
             />
           </div>
         )}
         
         <div className="border-t border-border pt-4">
-          <label className="text-sm text-muted-foreground block mb-2">消费模式</label>
+          <label className="text-sm text-muted-foreground block mb-2">{t('consumer.config.mode.title')}</label>
           <div className="flex gap-2">
             <button
               onClick={() => onChange({ ...config, mode: 'preview' })}
@@ -560,13 +561,13 @@ function ConsumerConfigPanel({
         
         {config.mode === 'file' && (
           <div className="border-t border-border pt-4">
-            <label className="text-sm text-muted-foreground block mb-1">文件格式</label>
+            <label className="text-sm text-muted-foreground block mb-1">{t('consumer.config.fileFormat')}</label>
             <Select
               value={config.fileFormat}
               onChange={e => onChange({ ...config, fileFormat: e.target.value as 'json' | 'csv' | 'jsonl' })}
               options={[
-                { value: 'json', label: 'JSON 数组' },
-                { value: 'jsonl', label: 'JSON Lines (每行一条)' },
+                { value: 'json', label: t('consumer.config.formats.jsonArray') },
+                { value: 'jsonl', label: t('consumer.config.formats.jsonLines') },
                 { value: 'csv', label: 'CSV' },
               ]}
               className="w-full"
@@ -590,18 +591,19 @@ interface ConsumerConfig {
 
 // 消息数量限制选项
 const PREVIEW_LIMITS = [
-  { value: '100', label: '100 条' },
-  { value: '500', label: '500 条' },
-  { value: '1000', label: '1,000 条' },
-  { value: '5000', label: '5,000 条' },
-  { value: '10000', label: '10,000 条' },
-  { value: 'unlimited', label: '无限制' },
+  { value: '100', label: t('consumer.limits.100') },
+  { value: '500', label: t('consumer.limits.500') },
+  { value: '1000', label: t('consumer.limits.1000') },
+  { value: '5000', label: t('consumer.limits.5000') },
+  { value: '10000', label: t('consumer.limits.10000') },
+  { value: 'unlimited', label: t('consumer.limits.unlimited') },
 ];
 
 export function ConsumerPage() {
   const navigate = useNavigate();
   const { topic } = useParams();
   const { activeConnection } = useConnectionStore();
+  const { t } = useTranslation();
   
   const [messages, setMessages] = useState<KafkaMessage[]>([]);
   const [isConsuming, setIsConsuming] = useState(false);
@@ -657,7 +659,7 @@ export function ConsumerPage() {
   // 组件卸载时的清理
   useEffect(() => {
     return () => {
-      // 只有在不是切换 topic 的情况下才停止消费
+      // 只有在不是切换 topic 的情况下才t('consumer.stop')消费
       if (!isSwitchingTopicRef.current && sessionId) {
         console.log('[Kafkit] Component unmounting, stopping consumption');
         // 使用同步方式清理，避免异步操作
@@ -880,7 +882,7 @@ export function ConsumerPage() {
         unlistenRef.current = unlisten;
       }
     } catch (err) {
-      alert('启动消费失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      alert(t('consumer.alerts.startFailed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
     }
   };
 
@@ -916,7 +918,7 @@ export function ConsumerPage() {
     setMessages([]);
   };
 
-  // 导出数据 - 使用文件选择对话框
+  // t('consumer.export')数据 - 使用文件选择对话框
   const exportMessages = async (format: 'json' | 'csv' = 'json') => {
     const dialog = await getTauriDialog();
     if (!dialog) {
@@ -979,9 +981,9 @@ export function ConsumerPage() {
       }
 
       await invoke('save_to_file', { filePath, content });
-      console.log(`已导出 ${messages.length} 条消息到 ${filePath}`);
+      console.log(`Exported ${messages.length} messages to ${filePath}`);
     } catch (err) {
-      console.error('导出失败:', err);
+      console.error('Export failed:', err);
     }
   };
 
@@ -1041,10 +1043,10 @@ export function ConsumerPage() {
 
   const partitionOptions = detail 
     ? [
-        { value: 'all', label: '所有分区' },
+        { value: 'all', label: t('consumer.columns.partition') + ': All' },
         ...detail.partitions.map(p => ({ value: String(p.partition), label: `P${p.partition}` }))
       ]
-    : [{ value: 'all', label: '所有分区' }];
+    : [{ value: 'all', label: t('consumer.columns.partition') + ': All' }];
 
   const getOffsetLabel = () => {
     switch (consumerConfig.offsetType) {
@@ -1092,7 +1094,7 @@ export function ConsumerPage() {
                     if (isConsuming) {
                       await stopConsumption();
                     }
-                    // 清空消息
+                    // t('consumer.clear')消息
                     setMessages([]);
                     // 重置状态
                     setDetail(null);
@@ -1186,13 +1188,13 @@ export function ConsumerPage() {
                   onClick={() => exportMessages('json')}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-muted first:rounded-t-lg"
                 >
-                  导出 JSON
+                  t('consumer.exportJson')
                 </button>
                 <button
                   onClick={() => exportMessages('csv')}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-muted last:rounded-b-lg"
                 >
-                  导出 CSV
+                  t('consumer.exportCsv')
                 </button>
               </div>
             </div>
@@ -1213,7 +1215,7 @@ export function ConsumerPage() {
           ) : (
             <Button size="sm" onClick={startConsumption}>
               <Play className="w-4 h-4 mr-1" />
-              {consumerConfig.mode === 'file' ? '开始保存' : '开始'}
+              {consumerConfig.mode === 'file' ? t('consumer.config.mode.file') : t('consumer.start')}
             </Button>
           )}
         </div>
@@ -1225,13 +1227,13 @@ export function ConsumerPage() {
           {/* 表头 */}
           <div className="flex-shrink-0 grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
             <span></span>
-            <span>序号</span>
-            <span>分区</span>
+            <span>{t('consumer.columns.index')}</span>
+            <span>{t('consumer.columns.partition')}</span>
             <span>Offset</span>
-            <span>时间戳</span>
+            <span>{t('consumer.columns.timestamp')}</span>
             <span>Key</span>
-            <span>Value 预览</span>
-            <span className="text-center">操作</span>
+            <span>{t('consumer.columns.value')}</span>
+            <span className="text-center">{t('consumer.columns.actions')}</span>
           </div>
 
           {/* Messages */}
@@ -1250,7 +1252,7 @@ export function ConsumerPage() {
           >
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                {isConsuming ? '等待消息...' : '点击"开始"按钮消费消息'}
+                {isConsuming ? t('consumer.waiting') : t('consumer.clickToStart')}
               </div>
             ) : (
               <div>
@@ -1274,14 +1276,14 @@ export function ConsumerPage() {
           <FileText className="w-16 h-16 mb-4 opacity-50" />
           {isConsuming ? (
             <div className="text-center">
-              <p className="text-lg font-medium text-foreground mb-2">正在写入文件...</p>
-              <p className="text-sm">已写入 {fileMessageCount} 条消息</p>
-              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || '准备中...'}</p>
+              <p className="text-lg font-medium text-foreground mb-2">{t('consumer.status.writing')}</p>
+              <p className="text-sm">{t('consumer.status.written', { count: fileMessageCount })}</p>
+              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || 'Preparing...'}</p>
             </div>
           ) : (
             <div className="text-center">
-              <p className="text-lg font-medium text-foreground mb-2">文件保存模式</p>
-              <p className="text-sm">消息将直接保存到文件，不在程序中显示</p>
+              <p className="text-lg font-medium text-foreground mb-2">{t('consumer.status.fileMode')}</p>
+              <p className="text-sm">{t('consumer.status.fileModeDesc')}</p>
               <p className="text-xs mt-2">格式: {consumerConfig.fileFormat.toUpperCase()}</p>
             </div>
           )}
@@ -1292,21 +1294,21 @@ export function ConsumerPage() {
       <div className="flex-shrink-0 h-8 border-t border-border flex items-center justify-between px-4 bg-muted/50 text-xs">
         <span className="text-muted-foreground">
           {consumerConfig.mode === 'preview' 
-            ? `共 ${messages.length} 条消息${previewLimit !== 'unlimited' ? ` (限制 ${previewLimit})` : ''}`
-            : '文件保存模式'
+            ? t('consumer.status.totalMessages', { count: messages.length })
+            : t('consumer.status.fileMode')
           }
         </span>
         <div className="flex items-center gap-4">
           <span className="text-muted-foreground">
-            起始: <span className="text-foreground">{getOffsetLabel()}</span>
+            Start: <span className="text-foreground">{getOffsetLabel()}</span>
           </span>
           <span className="text-muted-foreground">
-            模式: <span className="text-foreground">{consumerConfig.mode === 'file' ? '保存到文件' : '程序预览'}</span>
+            Mode: <span className="text-foreground">{consumerConfig.mode === 'file' ? t('consumer.config.mode.file') : t('consumer.config.mode.preview')}</span>
           </span>
           {isConsuming && (
             <span className="flex items-center gap-1.5 text-green-600">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              消费中
+              t('consumer.status.consuming')
             </span>
           )}
         </div>

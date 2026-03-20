@@ -13,7 +13,25 @@
     "close": "Close",
     "confirm": "Confirm",
     "confirmDelete": "Confirm Delete",
-    "search": "Search"
+    "search": "Search",
+    "send": "Send",
+    "stop": "Stop",
+    "start": "Start",
+    "copy": "Copy",
+    "copied": "Copied",
+    "export": "Export",
+    "clear": "Clear",
+    "success": "Success",
+    "failed": "Failed",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "next": "Next",
+    "previous": "Previous",
+    "done": "Done"
   },
   "nav": {
     "connections": "Connections",
@@ -45,7 +63,30 @@
     "form": {
       "namePlaceholder": "Production Kafka",
       "serversPlaceholder": "localhost:9092,localhost:9093",
-      "serversHint": "Multiple addresses separated by comma, format: host:port"
+      "serversHint": "Multiple addresses separated by comma, format: host:port",
+      "basicInfo": "Basic Information",
+      "security": "Security Settings",
+      "username": "Username",
+      "password": "Password",
+      "caCert": "CA Certificate Path (optional)",
+      "clientCert": "Client Certificate Path (optional)",
+      "clientKey": "Client Key Path (optional)",
+      "keytabPath": "Keytab Path (optional)",
+      "scramMechanism": "SCRAM Mechanism",
+      "fillTestConfig": "Fill Test Config"
+    },
+    "authTypes": {
+      "none": "No Auth (PLAINTEXT)",
+      "saslPlain": "SASL PLAIN",
+      "saslScram": "SASL SCRAM",
+      "saslGssapi": "SASL GSSAPI (Kerberos)",
+      "ssl": "SSL/TLS"
+    },
+    "alerts": {
+      "editOnlyInDesktop": "Edit feature requires desktop app",
+      "loadFailed": "Failed to load connection",
+      "saveFailed": "Failed to save",
+      "testFailed": "Test failed"
     }
   },
   "topics": {
@@ -91,6 +132,140 @@
       "messageCount": "Message Count"
     }
   },
+  "producer": {
+    "title": "Produce Message",
+    "singleMode": "Single",
+    "batchMode": "Batch",
+    "scheduledMode": "Scheduled",
+    "format": "Message Format",
+    "formats": {
+      "text": "Plain Text",
+      "json": "JSON",
+      "csv": "CSV"
+    },
+    "loadExample": "Load Example",
+    "formatJson": "Format JSON",
+    "partition": "Partition (optional)",
+    "partitionPlaceholder": "Auto assign",
+    "key": "Key (optional)",
+    "keyPlaceholder": "message key",
+    "batchSize": "Batch Size",
+    "interval": "Interval (ms)",
+    "intervalHint": "Recommended: 100-5000ms",
+    "repeatCount": "Repeat Count",
+    "repeatHint": "Total = lines × repeats",
+    "contentSingle": "Message Content",
+    "contentBatch": "Message Content (one per line)",
+    "placeholderSingle": "Enter message content...",
+    "placeholderBatch": "Enter one message per line, will be sent in order...",
+    "progress": "Progress",
+    "send": "Send",
+    "sendBatch": "Send Batch",
+    "startScheduled": "Start Scheduled Send",
+    "stop": "Stop",
+    "success": "Message sent successfully",
+    "batchSuccess": "Successfully sent {count} messages",
+    "batchComplete": "Send complete: {success} success, {failed} failed",
+    "failed": "Send failed",
+    "scheduledProgress": "Progress: {current}/{total} | Success: {success} | Failed: {failed}",
+    "scheduledComplete": "Send complete! Total: {total} | Success: {success} | Failed: {failed}"
+  },
+  "consumer": {
+    "title": "Consume Messages",
+    "start": "Start",
+    "stop": "Stop",
+    "clear": "Clear",
+    "export": "Export",
+    "exportJson": "Export JSON",
+    "exportCsv": "Export CSV",
+    "autoScroll": "Auto Scroll",
+    "waiting": "Waiting for messages...",
+    "clickToStart": "Click \"Start\" to consume messages",
+    "columns": {
+      "index": "#",
+      "partition": "Partition",
+      "offset": "Offset",
+      "timestamp": "Timestamp",
+      "key": "Key",
+      "value": "Value Preview",
+      "actions": "Actions"
+    },
+    "config": {
+      "title": "Consumer Configuration",
+      "startPosition": "Start Position",
+      "offset": "Offset",
+      "offsetPlaceholder": "Enter offset value",
+      "mode": {
+        "title": "Consume Mode",
+        "preview": "Preview in App",
+        "file": "Save to File"
+      },
+      "fileFormat": "File Format",
+      "formats": {
+        "jsonArray": "JSON Array",
+        "jsonLines": "JSON Lines (one per line)"
+      },
+      "positions": {
+        "latest": "Latest (newest messages)",
+        "earliest": "Earliest (oldest messages)",
+        "timestamp": "Timestamp (specific time)",
+        "offset": "Offset (specific offset)"
+      }
+    },
+    "timeSelector": {
+      "label": "Timestamp",
+      "quickSelect": "Quick Select",
+      "now": "Now",
+      "hourAgo": "1 hour ago",
+      "todayMidnight": "Today midnight",
+      "yesterday": "Yesterday",
+      "date": "Date",
+      "time": "Time"
+    },
+    "limits": {
+      "100": "100 messages",
+      "500": "500 messages",
+      "1000": "1,000 messages",
+      "5000": "5,000 messages",
+      "10000": "10,000 messages",
+      "unlimited": "Unlimited"
+    },
+    "status": {
+      "consuming": "Consuming",
+      "writing": "Writing to file...",
+      "written": "Written {count} messages to file",
+      "fileMode": "File Save Mode",
+      "fileModeDesc": "Messages will be saved directly to file, not displayed in app",
+      "totalMessages": "{count} messages total",
+      "startFrom": "Start: {position}",
+      "mode": "Mode: {mode}"
+    },
+    "alerts": {
+      "startFailed": "Failed to start consuming",
+      "exportFailed": "Export failed"
+    }
+  },
+  "consumerGroups": {
+    "title": "Consumer Groups",
+    "refresh": "Refresh",
+    "selectGroup": "Select a Consumer Group to view details",
+    "totalLag": "Total Lag",
+    "columns": {
+      "topic": "Topic",
+      "partition": "Partition",
+      "currentOffset": "Current Offset",
+      "logEnd": "Log End",
+      "lag": "Lag"
+    },
+    "status": {
+      "loading": "Loading...",
+      "noData": "No consumption data",
+      "empty": "No Consumer Groups"
+    },
+    "errors": {
+      "loadFailed": "Failed to load consumer groups"
+    }
+  },
   "settings": {
     "title": "Settings",
     "language": "Language",
@@ -121,5 +296,10 @@
         "description": "Consume and produce messages with multiple serialization formats"
       }
     }
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "boundaryTitle": "Oops!",
+    "boundaryMessage": "Something went wrong. Please refresh the page to try again."
   }
 }

@@ -13,7 +13,25 @@
     "close": "关闭",
     "confirm": "确认",
     "confirmDelete": "确认删除",
-    "search": "搜索"
+    "search": "搜索",
+    "send": "发送",
+    "stop": "停止",
+    "start": "开始",
+    "copy": "复制",
+    "copied": "已复制",
+    "export": "导出",
+    "clear": "清空",
+    "success": "成功",
+    "failed": "失败",
+    "error": "错误",
+    "warning": "警告",
+    "info": "信息",
+    "yes": "是",
+    "no": "否",
+    "ok": "确定",
+    "next": "下一步",
+    "previous": "上一步",
+    "done": "完成"
   },
   "nav": {
     "connections": "连接管理",
@@ -45,7 +63,30 @@
     "form": {
       "namePlaceholder": "生产环境 Kafka",
       "serversPlaceholder": "localhost:9092,localhost:9093",
-      "serversHint": "多个地址用逗号分隔，格式：host:port"
+      "serversHint": "多个地址用逗号分隔，格式：host:port",
+      "basicInfo": "基本信息",
+      "security": "安全设置",
+      "username": "用户名",
+      "password": "密码",
+      "caCert": "CA 证书路径 (可选)",
+      "clientCert": "客户端证书路径 (可选)",
+      "clientKey": "客户端密钥路径 (可选)",
+      "keytabPath": "Keytab 路径 (可选)",
+      "scramMechanism": "SCRAM 机制",
+      "fillTestConfig": "填入测试配置"
+    },
+    "authTypes": {
+      "none": "无认证 (PLAINTEXT)",
+      "saslPlain": "SASL PLAIN",
+      "saslScram": "SASL SCRAM",
+      "saslGssapi": "SASL GSSAPI (Kerberos)",
+      "ssl": "SSL/TLS"
+    },
+    "alerts": {
+      "editOnlyInDesktop": "编辑功能需要在桌面端运行",
+      "loadFailed": "加载连接失败",
+      "saveFailed": "保存失败",
+      "testFailed": "测试失败"
     }
   },
   "topics": {
@@ -91,6 +132,140 @@
       "messageCount": "消息数"
     }
   },
+  "producer": {
+    "title": "发送消息",
+    "singleMode": "单条",
+    "batchMode": "批量",
+    "scheduledMode": "定时",
+    "format": "消息格式",
+    "formats": {
+      "text": "纯文本",
+      "json": "JSON",
+      "csv": "CSV"
+    },
+    "loadExample": "加载示例",
+    "formatJson": "格式化",
+    "partition": "Partition (可选)",
+    "partitionPlaceholder": "自动分配",
+    "key": "Key (可选)",
+    "keyPlaceholder": "message key",
+    "batchSize": "批次大小",
+    "interval": "发送间隔 (毫秒)",
+    "intervalHint": "建议: 100-5000ms",
+    "repeatCount": "重复次数",
+    "repeatHint": "总消息数 = 行数 × 重复次数",
+    "contentSingle": "消息内容",
+    "contentBatch": "消息内容（每行一条消息）",
+    "placeholderSingle": "输入消息内容...",
+    "placeholderBatch": "每行输入一条消息，将按顺序发送...",
+    "progress": "发送进度",
+    "send": "发送",
+    "sendBatch": "批量发送",
+    "startScheduled": "开始定时发送",
+    "stop": "停止发送",
+    "success": "消息发送成功",
+    "batchSuccess": "成功发送 {count} 条消息",
+    "batchComplete": "发送完成: {success} 成功, {failed} 失败",
+    "failed": "发送失败",
+    "scheduledProgress": "进度: {current}/{total} | 成功: {success} | 失败: {failed}",
+    "scheduledComplete": "发送完成! 总计: {total} | 成功: {success} | 失败: {failed}"
+  },
+  "consumer": {
+    "title": "消费消息",
+    "start": "开始",
+    "stop": "停止",
+    "clear": "清空",
+    "export": "导出",
+    "exportJson": "导出 JSON",
+    "exportCsv": "导出 CSV",
+    "autoScroll": "自动滚动",
+    "waiting": "等待消息...",
+    "clickToStart": "点击\"开始\"按钮消费消息",
+    "columns": {
+      "index": "序号",
+      "partition": "分区",
+      "offset": "Offset",
+      "timestamp": "时间戳",
+      "key": "Key",
+      "value": "Value 预览",
+      "actions": "操作"
+    },
+    "config": {
+      "title": "消费参数配置",
+      "startPosition": "起始位置",
+      "offset": "偏移量",
+      "offsetPlaceholder": "输入 offset 数值",
+      "mode": {
+        "title": "消费模式",
+        "preview": "程序预览",
+        "file": "保存到文件"
+      },
+      "fileFormat": "文件格式",
+      "formats": {
+        "jsonArray": "JSON 数组",
+        "jsonLines": "JSON Lines (每行一条)"
+      },
+      "positions": {
+        "latest": "Latest (最新消息)",
+        "earliest": "Earliest (最早消息)",
+        "timestamp": "Timestamp (指定时间)",
+        "offset": "Offset (指定偏移量)"
+      }
+    },
+    "timeSelector": {
+      "label": "时间戳",
+      "quickSelect": "快速选择",
+      "now": "现在",
+      "hourAgo": "1小时前",
+      "todayMidnight": "今天零点",
+      "yesterday": "昨天",
+      "date": "日期",
+      "time": "时间"
+    },
+    "limits": {
+      "100": "100 条",
+      "500": "500 条",
+      "1000": "1,000 条",
+      "5000": "5,000 条",
+      "10000": "10,000 条",
+      "unlimited": "无限制"
+    },
+    "status": {
+      "consuming": "消费中",
+      "writing": "正在写入文件...",
+      "written": "已写入 {count} 条到文件",
+      "fileMode": "文件保存模式",
+      "fileModeDesc": "消息将直接保存到文件，不在程序中显示",
+      "totalMessages": "共 {count} 条消息",
+      "startFrom": "起始: {position}",
+      "mode": "模式: {mode}"
+    },
+    "alerts": {
+      "startFailed": "启动消费失败",
+      "exportFailed": "导出失败"
+    }
+  },
+  "consumerGroups": {
+    "title": "Consumer Groups",
+    "refresh": "刷新",
+    "selectGroup": "选择一个 Consumer Group 查看详情",
+    "totalLag": "总 Lag",
+    "columns": {
+      "topic": "Topic",
+      "partition": "Partition",
+      "currentOffset": "Current Offset",
+      "logEnd": "Log End",
+      "lag": "Lag"
+    },
+    "status": {
+      "loading": "加载中...",
+      "noData": "暂无消费进度数据",
+      "empty": "暂无 Consumer Group"
+    },
+    "errors": {
+      "loadFailed": "获取消费组失败"
+    }
+  },
   "settings": {
     "title": "设置",
     "language": "语言",
@@ -121,5 +296,10 @@
         "description": "消费和生产消息，支持多种序列化格式"
       }
     }
+  },
+  "errors": {
+    "generic": "应用发生错误",
+    "boundaryTitle": "出错了",
+    "boundaryMessage": "应用发生错误，请刷新页面重试"
   }
 }

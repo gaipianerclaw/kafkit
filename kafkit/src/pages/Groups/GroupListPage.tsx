@@ -4,6 +4,7 @@ import { RefreshCw, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
 import type { ConsumerGroupInfo, PartitionLag } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // 检测是否在 Tauri 环境中
 const isTauri = () => {
@@ -22,6 +23,7 @@ const getService = async () => {
 export function GroupListPage() {
   const navigate = useNavigate();
   const { activeConnection } = useConnectionStore();
+  const { t } = useTranslation();
   
   const [groups, setGroups] = useState<ConsumerGroupInfo[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function GroupListPage() {
       setGroups(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch groups:', err);
-      setError(err instanceof Error ? err.message : '获取消费组失败');
+      setError(err instanceof Error ? err.message : t('consumerGroups.errors.loadFailed'));
       setGroups([]);
     } finally {
       setLoading(false);
@@ -94,8 +96,8 @@ export function GroupListPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">请先选择一个连接</p>
-          <Button onClick={() => navigate('/')}>返回首页</Button>
+          <p className="text-muted-foreground mb-4">{t('topics.selectConnection')}</p>
+          <Button onClick={() => navigate('/')}>{t('common.back')}</Button>
         </div>
       </div>
     );
@@ -105,10 +107,10 @@ export function GroupListPage() {
     <div className="flex-1 flex flex-col">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4">
-        <h1 className="text-lg font-semibold">Consumer Groups</h1>
+        <h1 className="text-lg font-semibold">{t('consumerGroups.title')}</h1>
         <Button variant="outline" size="sm" onClick={fetchGroups} isLoading={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          刷新
+          {t('consumerGroups.refresh')}
         </Button>
       </div>
 
@@ -118,12 +120,12 @@ export function GroupListPage() {
         <div className="w-80 border-r border-border overflow-auto">
           {error && (
             <div className="p-4 bg-red-50 text-red-600 text-sm">
-              错误: {error}
+              {t('common.error')}: {error}
             </div>
           )}
           {!groups || groups.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
-              {loading ? '加载中...' : '暂无 Consumer Group'}
+              {loading ? t('consumerGroups.status.loading') : t('consumerGroups.status.empty')}
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -156,27 +158,27 @@ export function GroupListPage() {
                 <div>
                   <h2 className="text-lg font-semibold">{selectedGroup}</h2>
                   <p className="text-sm text-muted-foreground">
-                    总 Lag: {totalLag.toLocaleString()}
+                    {t('consumerGroups.totalLag')}: {totalLag.toLocaleString()}
                   </p>
                 </div>
               </div>
 
               {lagLoading ? (
-                <div className="text-center py-8">加载中...</div>
+                <div className="text-center py-8">{t('consumerGroups.status.loading')}</div>
               ) : !lagData || lagData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  暂无消费进度数据
+                  {t('consumerGroups.status.noData')}
                 </div>
               ) : (
                 <div className="border border-border rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium">Topic</th>
-                        <th className="px-4 py-2 text-center text-sm font-medium">Partition</th>
-                        <th className="px-4 py-2 text-right text-sm font-medium">Current Offset</th>
-                        <th className="px-4 py-2 text-right text-sm font-medium">Log End</th>
-                        <th className="px-4 py-2 text-right text-sm font-medium">Lag</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium">{t('consumerGroups.columns.topic')}</th>
+                        <th className="px-4 py-2 text-center text-sm font-medium">{t('consumerGroups.columns.partition')}</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium">{t('consumerGroups.columns.currentOffset')}</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium">{t('consumerGroups.columns.logEnd')}</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium">{t('consumerGroups.columns.lag')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -201,7 +203,7 @@ export function GroupListPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <Users className="w-12 h-12 mb-4" />
-              <p>选择一个 Consumer Group 查看详情</p>
+              <p>{t('consumerGroups.selectGroup')}</p>
             </div>
           )}
         </div>
