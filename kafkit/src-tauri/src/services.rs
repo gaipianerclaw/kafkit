@@ -697,15 +697,33 @@ impl ConnectionManager {
         
         let client = self.get_client(connection).await?;
         
-        // 获取消费组列表
-        let groups = client.fetch_group_list(None, Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch consumer groups: {}", e)))?;
+        // 获取消费组列表 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(None, Duration::from_secs(5)) {
+            Ok(g) => g,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch consumer groups: {}", e);
+                // 返回空列表而不是错误，避免前端闪退
+                return Ok(vec![]);
+            }
+        };
         
         let mut result = Vec::new();
         for group in groups.groups() {
+            // 将状态转换为字符串并标准化
+            let state_str = format!("{:?}", group.state());
+            // 确保状态值与前端期望的一致
+            let normalized_state = match state_str.as_str() {
+                "Stable" => "Stable",
+                "PreparingRebalance" => "PreparingRebalance",
+                "CompletingRebalance" => "CompletingRebalance",
+                "Dead" => "Dead",
+                "Unknown" => "Unknown",
+                _ => "Unknown",
+            };
+            
             result.push(ConsumerGroupInfo {
                 group_id: group.name().to_string(),
-                state: format!("{:?}", group.state()),
+                state: normalized_state.to_string(),
                 member_count: group.members().len() as i32,
                 coordinator: 0, // rdkafka 0.36 版本不直接暴露 coordinator ID
             });
@@ -725,9 +743,14 @@ impl ConnectionManager {
         
         let client = self.get_client(connection).await?;
         
-        // 获取消费组信息
-        let groups = client.fetch_group_list(Some(group_id), Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch group info: {}", e)))?;
+        // 获取消费组信息 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(5)) {
+            Ok(g) => g,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch group info: {}", e);
+                return Ok(vec![]);
+            }
+        };
         
         let mut topic_partitions: Vec<(String, i32)> = Vec::new();
         

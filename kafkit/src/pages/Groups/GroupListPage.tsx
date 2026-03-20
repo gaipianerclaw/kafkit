@@ -28,6 +28,7 @@ export function GroupListPage() {
   const [lagData, setLagData] = useState<PartitionLag[]>([]);
   const [loading, setLoading] = useState(false);
   const [lagLoading, setLagLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeConnection) {
@@ -45,12 +46,16 @@ export function GroupListPage() {
     if (!activeConnection) return;
     
     setLoading(true);
+    setError(null);
     try {
       const tauriService = await getService();
       const data = await tauriService.listConsumerGroups(activeConnection);
-      setGroups(data);
+      // 确保 data 是数组
+      setGroups(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch groups:', err);
+      setError(err instanceof Error ? err.message : '获取消费组失败');
+      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -63,9 +68,11 @@ export function GroupListPage() {
     try {
       const tauriService = await getService();
       const data = await tauriService.getConsumerLag(activeConnection, groupId);
-      setLagData(data);
+      // 确保 data 是数组
+      setLagData(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch lag:', err);
+      setLagData([]);
     } finally {
       setLagLoading(false);
     }
@@ -81,7 +88,7 @@ export function GroupListPage() {
     }
   };
 
-  const totalLag = lagData.reduce((sum, item) => sum + item.lag, 0);
+  const totalLag = (lagData || []).reduce((sum, item) => sum + (item?.lag || 0), 0);
 
   if (!activeConnection) {
     return (
@@ -109,26 +116,31 @@ export function GroupListPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Group List */}
         <div className="w-80 border-r border-border overflow-auto">
-          {groups.length === 0 ? (
+          {error && (
+            <div className="p-4 bg-red-50 text-red-600 text-sm">
+              错误: {error}
+            </div>
+          )}
+          {!groups || groups.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
-              暂无 Consumer Group
+              {loading ? '加载中...' : '暂无 Consumer Group'}
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {groups.map(group => (
+              {groups.map((group, index) => (
                 <button
-                  key={group.groupId}
-                  onClick={() => setSelectedGroup(group.groupId)}
+                  key={group?.groupId || index}
+                  onClick={() => setSelectedGroup(group?.groupId || null)}
                   className={`w-full p-4 text-left hover:bg-muted/50 transition-colors ${
-                    selectedGroup === group.groupId ? 'bg-muted' : ''
+                    selectedGroup === group?.groupId ? 'bg-muted' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${getStateColor(group.state)}`} />
-                    <span className="font-medium truncate">{group.groupId}</span>
+                    <span className={`w-2 h-2 rounded-full ${getStateColor(group?.state)}`} />
+                    <span className="font-medium truncate">{group?.groupId || 'Unknown'}</span>
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    Members: {group.memberCount} | Coordinator: {group.coordinator}
+                    Members: {group?.memberCount ?? 0} | Coordinator: {group?.coordinator ?? 0}
                   </div>
                 </button>
               ))}
@@ -151,7 +163,7 @@ export function GroupListPage() {
 
               {lagLoading ? (
                 <div className="text-center py-8">加载中...</div>
-              ) : lagData.length === 0 ? (
+              ) : !lagData || lagData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   暂无消费进度数据
                 </div>
@@ -170,13 +182,13 @@ export function GroupListPage() {
                     <tbody className="divide-y divide-border">
                       {lagData.map((item, idx) => (
                         <tr key={idx} className="hover:bg-muted/50">
-                          <td className="px-4 py-2 text-sm">{item.topic}</td>
-                          <td className="px-4 py-2 text-sm text-center">{item.partition}</td>
-                          <td className="px-4 py-2 text-sm text-right">{item.currentOffset.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-sm text-right">{item.logEndOffset.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm">{item?.topic || '-'}</td>
+                          <td className="px-4 py-2 text-sm text-center">{item?.partition ?? '-'}</td>
+                          <td className="px-4 py-2 text-sm text-right">{(item?.currentOffset ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm text-right">{(item?.logEndOffset ?? 0).toLocaleString()}</td>
                           <td className="px-4 py-2 text-sm text-right">
-                            <span className={`${item.lag > 1000 ? 'text-red-500 font-medium' : ''}`}>
-                              {item.lag.toLocaleString()}
+                            <span className={`${(item?.lag ?? 0) > 1000 ? 'text-red-500 font-medium' : ''}`}>
+                              {(item?.lag ?? 0).toLocaleString()}
                             </span>
                           </td>
                         </tr>
