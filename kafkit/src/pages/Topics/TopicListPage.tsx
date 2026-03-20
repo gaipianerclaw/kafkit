@@ -169,15 +169,43 @@ export function TopicListPage() {
     }
   };
 
-  const handleDelete = async (topicName: string) => {
+  const handleDelete = async (topicName: string, event?: React.MouseEvent) => {
     if (!activeConnection) return;
-    if (!confirm(t('topics.deleteConfirm', { name: topicName }))) return;
+    
+    // 阻止事件冒泡和默认行为
+    event?.stopPropagation();
+    event?.preventDefault();
+    
+    // 使用 Tauri dialog 确认对话框
+    let confirmed = false;
+    if (isTauri()) {
+      try {
+        const dialog = await import('@tauri-apps/plugin-dialog');
+        confirmed = await dialog.confirm(t('topics.deleteConfirm', { name: topicName }), {
+          title: t('common.confirmDelete'),
+          kind: 'warning',
+        });
+      } catch {
+        // 如果 dialog 插件加载失败，使用原生 confirm
+        confirmed = window.confirm(t('topics.deleteConfirm', { name: topicName }));
+      }
+    } else {
+      confirmed = window.confirm(t('topics.deleteConfirm', { name: topicName }));
+    }
+    
+    if (!confirmed) {
+      console.log('[Kafkit] Delete cancelled for topic:', topicName);
+      return;
+    }
 
+    console.log('[Kafkit] Deleting topic:', topicName);
     try {
       const tauriService = await getService();
       await tauriService.deleteTopic(activeConnection, topicName);
+      console.log('[Kafkit] Topic deleted successfully:', topicName);
       await fetchTopics();
     } catch (err) {
+      console.error('[Kafkit] Failed to delete topic:', err);
       alert(t('topics.deleteError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
     }
   };
@@ -305,7 +333,10 @@ export function TopicListPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(topic.name)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(topic.name, e);
+                            }}
                             title={t('common.delete')}
                             className="text-destructive hover:text-destructive"
                           >
