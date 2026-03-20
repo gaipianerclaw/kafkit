@@ -314,8 +314,18 @@ pub async fn list_consumer_groups(
     state: State<'_, AppState>,
 ) -> Result<Vec<ConsumerGroupInfo>> {
     println!("[Kafkit] Listing consumer groups");
-    // TODO: 实现真实的 Group 列表
-    Ok(vec![])
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 获取消费组列表
+    state.connection_manager.list_consumer_groups(&connection).await
 }
 
 #[tauri::command]
@@ -325,8 +335,18 @@ pub async fn get_consumer_lag(
     state: State<'_, AppState>,
 ) -> Result<Vec<PartitionLag>> {
     println!("[Kafkit] Getting consumer lag for group: {}", group_id);
-    // TODO: 实现真实的 Lag 查询
-    Ok(vec![])
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 获取消费延迟
+    state.connection_manager.get_consumer_lag(&connection, &group_id).await
 }
 
 #[tauri::command]
@@ -339,8 +359,18 @@ pub async fn reset_consumer_offset(
     state: State<'_, AppState>,
 ) -> Result<()> {
     println!("[Kafkit] Resetting offset for group: {}", group_id);
-    // TODO: 实现真实的偏移量重置
-    Ok(())
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 重置 offset
+    state.connection_manager.reset_consumer_offset(&connection, &group_id, &topic, partition, &reset_to).await
 }
 
 #[tauri::command]

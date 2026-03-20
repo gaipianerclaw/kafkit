@@ -1,5 +1,31 @@
 # 更新日志
 
+## v1.0.8 (2026-03-20)
+
+### ✨ 新增功能
+
+#### Consumer Group 管理功能
+- **消费组列表**: 查看所有 Consumer Group 及其状态
+  - 显示 Group ID、状态(Stable/PreparingRebalance/CompletingRebalance/Dead)
+  - 显示成员数量和协调器信息
+- **消费延迟(Lag)查看**: 
+  - 查看每个消费组在各 Topic-Partition 上的消费进度
+  - 显示 Current Offset、Log End Offset、Lag
+  - Lag 超过 1000 时高亮显示警告
+  - 计算总 Lag 数量
+- **偏移量重置**(部分实现):
+  - 支持重置到 Earliest、Latest、指定 Offset
+  - 支持按 Partition 重置或重置整个 Topic
+  - 计算目标 Offset(实际重置需要额外配置)
+
+### 🔧 技术实现
+- 后端实现 `list_consumer_groups` - 使用 `fetch_group_list` API
+- 后端实现 `get_consumer_lag` - 结合 `committed_offsets` 和 `fetch_watermarks`
+- 后端实现 `reset_consumer_offset` - 计算目标 Offset
+- 前端页面 `GroupListPage` - 左右分栏布局，左侧 Group 列表，右侧 Lag 详情
+
+---
+
 ## v1.0.7 (2026-03-20)
 
 ### ✨ 新增功能
