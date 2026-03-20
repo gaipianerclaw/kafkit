@@ -1,5 +1,18 @@
 # 更新日志
 
+## v1.0.11 (2026-03-20)
+
+### 🔧 CI/CD 修复
+
+#### GitHub Actions 构建修复
+- **修复 Rust action 名称错误**: `dtolnay/rust-action` → `dtolnay/rust-toolchain@stable`
+- **修复 Ubuntu 依赖**: `libwebkit2gtk-4.0-dev` → `libwebkit2gtk-4.1-dev` (Tauri v2 要求)
+- **添加缺失依赖**: `libssl-dev` 用于 OpenSSL 静态链接
+- **更新版本号**: 统一更新到 1.0.2 (package.json, Cargo.toml, tauri.conf.json)
+- **支持平台**: macOS (Intel/Apple Silicon), Linux (x64), Windows (x64)
+
+---
+
 ## v1.0.10 (2026-03-20)
 
 ### 🐛 Bug 修复
