@@ -107,6 +107,85 @@ function CreateTopicDialog({
   );
 }
 
+// 删除 Topic 确认对话框组件
+function DeleteTopicDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  topicName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  topicName: string;
+}) {
+  const { t } = useTranslation();
+  const [inputValue, setInputValue] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const isMatch = inputValue.trim() === topicName;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isMatch) return;
+
+    setDeleting(true);
+    try {
+      await onConfirm();
+      setInputValue('');
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-background border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+        <div className="px-6 py-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-destructive">{t('topics.deleteTitle')}</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+            <p className="text-sm text-destructive">
+              {t('topics.deleteWarning', { name: topicName })}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              {t('topics.deleteConfirmLabel')}
+            </label>
+            <Input
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              placeholder={topicName}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('topics.deleteConfirmHint', { name: topicName })}
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={deleting}>
+              {t('common.cancel')}
+            </Button>
+            <Button 
+              type="submit" 
+              variant="destructive"
+              isLoading={deleting}
+              disabled={!isMatch}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function TopicListPage() {
   const navigate = useNavigate();
   const { activeConnection } = useConnectionStore();
@@ -118,6 +197,8 @@ export function TopicListPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const lastFetchedConnectionRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -169,44 +250,31 @@ export function TopicListPage() {
     }
   };
 
-  const handleDelete = async (topicName: string, event?: React.MouseEvent) => {
+  const handleDeleteClick = (topicName: string, event?: React.MouseEvent) => {
     if (!activeConnection) return;
     
     // 阻止事件冒泡和默认行为
     event?.stopPropagation();
     event?.preventDefault();
     
-    // 使用 Tauri dialog 确认对话框
-    let confirmed = false;
-    if (isTauri()) {
-      try {
-        const dialog = await import('@tauri-apps/plugin-dialog');
-        confirmed = await dialog.confirm(t('topics.deleteConfirm', { name: topicName }), {
-          title: t('common.confirmDelete'),
-          kind: 'warning',
-        });
-      } catch {
-        // 如果 dialog 插件加载失败，使用原生 confirm
-        confirmed = window.confirm(t('topics.deleteConfirm', { name: topicName }));
-      }
-    } else {
-      confirmed = window.confirm(t('topics.deleteConfirm', { name: topicName }));
-    }
-    
-    if (!confirmed) {
-      console.log('[Kafkit] Delete cancelled for topic:', topicName);
-      return;
-    }
+    setTopicToDelete(topicName);
+    setShowDeleteDialog(true);
+  };
 
-    console.log('[Kafkit] Deleting topic:', topicName);
+  const handleDeleteConfirm = async () => {
+    if (!activeConnection || !topicToDelete) return;
+
+    console.log('[Kafkit] Deleting topic:', topicToDelete);
     try {
       const tauriService = await getService();
-      await tauriService.deleteTopic(activeConnection, topicName);
-      console.log('[Kafkit] Topic deleted successfully:', topicName);
+      await tauriService.deleteTopic(activeConnection, topicToDelete);
+      console.log('[Kafkit] Topic deleted successfully:', topicToDelete);
       await fetchTopics();
+      setTopicToDelete(null);
     } catch (err) {
       console.error('[Kafkit] Failed to delete topic:', err);
       alert(t('topics.deleteError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+      throw err;
     }
   };
 
@@ -333,10 +401,7 @@ export function TopicListPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(topic.name, e);
-                            }}
+                            onClick={(e) => handleDeleteClick(topic.name, e)}
                             title={t('common.delete')}
                             className="text-destructive hover:text-destructive"
                           >
@@ -368,6 +433,19 @@ export function TopicListPage() {
         onClose={() => setShowCreateDialog(false)}
         onCreate={handleCreateTopic}
       />
+
+      {/* Delete Topic Dialog */}
+      {topicToDelete && (
+        <DeleteTopicDialog
+          isOpen={showDeleteDialog}
+          onClose={() => {
+            setShowDeleteDialog(false);
+            setTopicToDelete(null);
+          }}
+          onConfirm={handleDeleteConfirm}
+          topicName={topicToDelete}
+        />
+      )}
     </div>
   );
 }
