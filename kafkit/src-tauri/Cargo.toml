@@ -35,4 +35,4 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync", "net", "time"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 thiserror = "1"
-rdkafka = { version = "0.36", default-features = false, features = ["cmake-build", "libz-static", "ssl-vendored", "tokio"] }
+rdkafka = { version = "0.37", default-features = false, features = ["cmake-build", "libz-static", "ssl-vendored", "tokio"] }

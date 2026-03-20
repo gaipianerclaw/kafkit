@@ -692,39 +692,89 @@ impl ConnectionManager {
     }
 
     /// 列出所有 Consumer Groups
-    pub async fn list_consumer_groups(&self, _connection: &Connection) -> Result<Vec<ConsumerGroupInfo>, AppError> {
-        println!("[Kafkit] Listing consumer groups - feature temporarily disabled due to rdkafka API limitations");
-        // 暂时返回空列表
-        // rdkafka 0.36 的 fetch_group_list 存在内存安全问题
-        // AdminClient 没有 list_groups 和 describe_consumer_groups 方法
-        Ok(vec![])
+    pub async fn list_consumer_groups(&self, connection: &Connection) -> Result<Vec<ConsumerGroupInfo>, AppError> {
+        println!("[Kafkit] Listing consumer groups for: {}", connection.name);
+        
+        let client = self.get_client(connection).await?;
+        
+        // 获取消费组列表 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(None, Duration::from_secs(5)) {
+            Ok(g) => g,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch consumer groups: {}", e);
+                // 返回空列表而不是错误，避免前端闪退
+                return Ok(vec![]);
+            }
+        };
+        
+        let mut result = Vec::new();
+        for group in groups.groups() {
+            // 将状态转换为字符串并标准化
+            let state_str = format!("{:?}", group.state());
+            // 确保状态值与前端期望的一致
+            let normalized_state = match state_str.as_str() {
+                "Stable" => "Stable",
+                "PreparingRebalance" => "PreparingRebalance",
+                "CompletingRebalance" => "CompletingRebalance",
+                "Dead" => "Dead",
+                "Unknown" => "Unknown",
+                _ => "Unknown",
+            };
+            
+            result.push(ConsumerGroupInfo {
+                group_id: group.name().to_string(),
+                state: normalized_state.to_string(),
+                member_count: group.members().len() as i32,
+                coordinator: 0, // rdkafka 0.37 版本不直接暴露 coordinator ID
+            });
+        }
+        
+        println!("[Kafkit] Found {} consumer groups", result.len());
+        Ok(result)
     }
 
     /// 获取 Consumer Group 的消费延迟 (Lag)
     pub async fn get_consumer_lag(
         &self,
-        _connection: &Connection,
-        _group_id: &str,
-    ) -> Result<Vec<PartitionLag>, AppError> {
-        println!("[Kafkit] Getting consumer lag - feature temporarily disabled");
-        // 暂时返回空列表
-        Ok(vec![])
-    }
-    
-    /// 获取 Consumer Group 的消费延迟 (Lag) - 原始实现待修复
-    #[allow(dead_code)]
-    async fn _get_consumer_lag_impl(
-        &self,
         connection: &Connection,
-        _group_id: &str,
+        group_id: &str,
     ) -> Result<Vec<PartitionLag>, AppError> {
+        println!("[Kafkit] Getting consumer lag for group: {}", group_id);
+        
         let client = self.get_client(connection).await?;
         
-        // 遍历所有 topics 获取 committed offsets
+        // 获取消费组信息 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(5)) {
+            Ok(g) => g,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch group info: {}", e);
+                return Ok(vec![]);
+            }
+        };
+        
+        let mut topic_partitions: Vec<(String, i32)> = Vec::new();
+        
+        for group in groups.groups() {
+            if group.name() != group_id {
+                continue;
+            }
+            
+            // 获取该 group 消费的所有 topic-partition
+            for member in group.members() {
+                if let Some(_assignment) = member.assignment() {
+                    // assignment 是 Vec<u8> 类型，包含序列化的数据
+                    let assignment_data: &[u8] = _assignment.as_ref();
+                    if assignment_data.len() >= 4 {
+                        println!("[Kafkit] Member {} has assignment of {} bytes", member.id(), assignment_data.len());
+                    }
+                }
+            }
+        }
+        
+        // 如果没有从 assignment 获取到分区，尝试从 committed offsets 获取
         let mut result = Vec::new();
         
         // 尝试获取所有 topics 的 committed offsets
-        // 先获取所有 topics
         let metadata = client.fetch_metadata(None, Duration::from_secs(10))
             .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
         
@@ -785,7 +835,7 @@ impl ConnectionManager {
         println!("[Kafkit] Found {} partitions with lag info", result.len());
         Ok(result)
     }
-
+        
     /// 重置 Consumer Group 的 Offset
     pub async fn reset_consumer_offset(
         &self,

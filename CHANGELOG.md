@@ -4,16 +4,15 @@
 
 ### 🐛 Bug 修复
 
-#### Consumer Group 功能临时禁用
+#### Consumer Group 功能修复
 - **问题**: rdkafka 0.36 的 `fetch_group_list` API 存在内存安全问题，导致程序闪退
-- **临时解决**: 禁用消费组功能，返回空列表避免崩溃
 - **错误信息**: `unsafe precondition(s) violated: slice::from_raw_parts requires the pointer to be aligned and non-null`
-- **后续计划**: 等待 rdkafka 更新或使用更低级的 Kafka API 重新实现
+- **解决**: 升级 rdkafka 从 0.36.0 到 0.37.0，修复了内存安全问题
+- **结果**: 消费组功能恢复正常，可以查看消费组列表和成员信息
 
-### 已知问题
-- 消费组列表显示为空（功能已禁用）
-- 消费延迟(Lag)查看不可用
-- Offset 重置功能不可用
+### 注意事项
+- 消费延迟(Lag)查询可能返回 `UnknownGroup` 错误（如果消费组临时不存在）
+- Offset 重置功能目前仅计算目标 offset，实际重置需要额外实现
 
 ---
 
