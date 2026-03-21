@@ -357,7 +357,7 @@ pub async fn reset_consumer_offset(
     partition: Option<i32>,
     reset_to: OffsetResetSpec,
     state: State<'_, AppState>,
-) -> Result<()> {
+) -> Result<Vec<PartitionOffsetResult>> {
     println!("[Kafkit] Resetting offset for group: {}", group_id);
     
     // 获取连接信息

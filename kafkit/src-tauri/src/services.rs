@@ -1,5 +1,4 @@
 use crate::models::*;
-use crate::models::BatchProduceError;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -844,74 +843,147 @@ impl ConnectionManager {
         topic: &str,
         partition: Option<i32>,
         reset_to: &OffsetResetSpec,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<PartitionOffsetResult>, AppError> {
         println!("[Kafkit] Resetting offset for group: {}, topic: {:?}", group_id, topic);
         
-        // 创建消费者用于获取 offset 信息
+        // 创建 AdminClient 用于执行偏移量重置
+        let admin_config = Self::create_client_config(connection)?;
+        let admin: AdminClient<DefaultClientContext> = admin_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+        
+        // 创建临时消费者用于获取 offset 信息
         let consumer_config = Self::create_client_config(connection)?;
         let consumer: BaseConsumer = consumer_config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
         
-        // 构建 TopicPartitionList
-        let mut tpl = TopicPartitionList::new();
-        
-        if let Some(p) = partition {
-            tpl.add_partition(topic, p);
+        // 获取目标分区列表
+        let target_partitions: Vec<i32> = if let Some(p) = partition {
+            vec![p]
         } else {
             // 获取 topic 的所有分区
             let metadata = consumer.fetch_metadata(Some(topic), Duration::from_secs(10))
                 .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
             
-            for topic_meta in metadata.topics() {
-                if topic_meta.name() == topic {
-                    for partition_meta in topic_meta.partitions() {
-                        tpl.add_partition(topic, partition_meta.id());
-                    }
-                }
-            }
+            metadata.topics()
+                .iter()
+                .find(|t| t.name() == topic)
+                .map(|t| t.partitions().iter().map(|p| p.id()).collect())
+                .unwrap_or_default()
+        };
+        
+        if target_partitions.is_empty() {
+            return Err(AppError::KafkaError(format!("No partitions found for topic: {}", topic)));
         }
         
-        // 根据 reset_to 类型确定目标 offset
-        for el in tpl.elements() {
-            let t = el.topic();
-            let p = el.partition();
-            
+        // 计算每个分区的目标 offset
+        let mut partitions_to_reset: Vec<(i32, i64)> = Vec::new();
+        
+        for p in &target_partitions {
             let target_offset = match reset_to {
                 OffsetResetSpec::Earliest => {
-                    // 获取 earliest offset
-                    let (low, _) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
+                    let (low, _) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     low
                 }
                 OffsetResetSpec::Latest => {
-                    // 获取 latest offset
-                    let (_, high) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
+                    let (_, high) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     high
                 }
-                OffsetResetSpec::Timestamp { timestamp: _ } => {
-                    // 通过时间戳查找 offset - 简化为使用 earliest
-                    // 实际实现需要使用 offsets_for_times
-                    let (low, _) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
-                        .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
-                    println!("[Kafkit] Timestamp reset not fully implemented, using earliest offset");
-                    low
+                OffsetResetSpec::Timestamp { timestamp } => {
+                    // 通过时间戳查找 offset
+                    let mut tpl = TopicPartitionList::new();
+                    tpl.add_partition_offset(topic, *p, KafkaOffset::Offset(*timestamp))
+                        .map_err(|e| AppError::KafkaError(format!("Failed to add partition: {}", e)))?;
+                    
+                    let offsets = consumer.offsets_for_times(tpl, Duration::from_secs(10))
+                        .map_err(|e| AppError::KafkaError(format!("Failed to lookup offset for timestamp: {}", e)))?;
+                    
+                    offsets.elements()
+                        .first()
+                        .and_then(|el| el.offset().to_raw())
+                        .filter(|&o| o >= 0)
+                        .unwrap_or_else(|| {
+                            // 如果时间戳查找失败，使用 earliest
+                            let (low, _) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
+                                .unwrap_or((0, 0));
+                            low
+                        })
                 }
-                OffsetResetSpec::Offset { offset } => {
-                    // 直接使用指定的 offset
-                    *offset
-                }
+                OffsetResetSpec::Offset { offset } => *offset,
             };
             
-            println!("[Kafkit] Would reset {}-{} to offset {} (target offset calculated)", t, p, target_offset);
+            println!("[Kafkit] Will reset {}-{} to offset {}", topic, p, target_offset);
+            partitions_to_reset.push((*p, target_offset));
         }
         
-        // 注意：rdkafka 的 Rust 版本中没有直接的 alter_consumer_group_offsets 方法
-        // 这需要通过 AdminClient 或手动创建 consumer 并提交 offset 来实现
-        // 目前仅计算目标 offset，实际重置需要使用 Kafka 的 admin 工具或脚本
+        // 使用 AdminClient 执行偏移量重置
+        let mut group_offsets: Vec<rdkafka::admin::GroupOffset> = Vec::new();
         
-        println!("[Kafkit] Offset reset target calculated for group: {} (actual reset requires admin operations)", group_id);
-        Ok(())
+        for (partition, offset) in &partitions_to_reset {
+            let mut tpl = TopicPartitionList::new();
+            tpl.add_partition_offset(topic, *partition, KafkaOffset::Offset(*offset))
+                .map_err(|e| AppError::KafkaError(format!("Failed to add partition to TPL: {}", e)))?;
+            
+            // 为每个分区创建一个 GroupOffset
+            for el in tpl.elements() {
+                group_offsets.push(rdkafka::admin::GroupOffset {
+                    group: group_id.to_string(),
+                    topic: el.topic().to_string(),
+                    partition: el.partition(),
+                    offset: offset.to_owned(),
+                });
+            }
+        }
+        
+        // 执行偏移量重置
+        let opts = AdminOptions::new();
+        let results = admin.alter_consumer_group_offsets(group_offsets, &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to alter consumer group offsets: {}", e)))?;
+        
+        // 收集结果
+        let mut reset_results = Vec::new();
+        for result in results {
+            match result {
+                Ok(offset) => {
+                    println!("[Kafkit] Successfully reset offset for {}-{} to {}", 
+                        offset.topic, offset.partition, offset.offset);
+                    reset_results.push(PartitionOffsetResult {
+                        topic: offset.topic,
+                        partition: offset.partition,
+                        offset: offset.offset,
+                        success: true,
+                        error: None,
+                    });
+                }
+                Err((group_offset, err)) => {
+                    let error_msg = format!("Failed to reset offset for {}-{}: {}", 
+                        group_offset.topic, group_offset.partition, err);
+                    println!("[Kafkit] {}", error_msg);
+                    reset_results.push(PartitionOffsetResult {
+                        topic: group_offset.topic,
+                        partition: group_offset.partition,
+                        offset: group_offset.offset,
+                        success: false,
+                        error: Some(error_msg),
+                    });
+                }
+            }
+        }
+        
+        // 检查是否有失败的项
+        let failed_count = reset_results.iter().filter(|r| !r.success).count();
+        if failed_count > 0 && failed_count == reset_results.len() {
+            return Err(AppError::KafkaError(
+                format!("Failed to reset offsets for all {} partitions", failed_count)
+            ));
+        }
+        
+        println!("[Kafkit] Offset reset completed for group: {} ({} succeeded, {} failed)", 
+            group_id, reset_results.len() - failed_count, failed_count);
+        
+        Ok(reset_results)
     }
 }
 

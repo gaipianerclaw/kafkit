@@ -261,6 +261,18 @@ pub enum OffsetResetSpec {
     Offset { offset: i64 },
 }
 
+/// 分区偏移量重置结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PartitionOffsetResult {
+    pub topic: String,
+    pub partition: i32,
+    pub offset: i64,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 // ================= Error Models =================
 
 #[derive(Debug, thiserror::Error)]

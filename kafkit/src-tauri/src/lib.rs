@@ -6,6 +6,13 @@ mod models;
 mod services;
 mod store;
 
+#[cfg(test)]
+mod models_tests;
+#[cfg(test)]
+mod services_tests;
+#[cfg(test)]
+mod store_tests;
+
 use commands::*;
 use services::{ConnectionManager, ConsumerService};
 use store::ConfigStore;
