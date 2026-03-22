@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, Trash2, Download, Copy, Check, ChevronDown, ChevronRight, Settings2, FileText, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -618,6 +618,12 @@ export function ConsumerPage() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
   const [previewLimit, setPreviewLimit] = useState('500');
+  
+  // 搜索过滤相关状态
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<'all' | 'key' | 'value'>('all');
+  const [useRegex, setUseRegex] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
   const [consumerConfig, setConsumerConfig] = useState<ConsumerConfig>({
     offsetType: 'latest',
     mode: 'preview',
@@ -921,6 +927,47 @@ export function ConsumerPage() {
   const clearMessages = () => {
     setMessages([]);
   };
+
+  // 消息过滤逻辑
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+
+    const query = searchQuery.trim();
+    let regex: RegExp | null = null;
+
+    if (useRegex) {
+      try {
+        const flags = caseSensitive ? '' : 'i';
+        regex = new RegExp(query, flags);
+      } catch (e) {
+        // 正则表达式无效，返回所有消息
+        return messages;
+      }
+    }
+
+    return messages.filter(msg => {
+      const searchInField = (field: string | undefined) => {
+        if (!field) return false;
+        if (useRegex && regex) {
+          return regex.test(field);
+        }
+        if (caseSensitive) {
+          return field.includes(query);
+        }
+        return field.toLowerCase().includes(query.toLowerCase());
+      };
+
+      switch (searchField) {
+        case 'key':
+          return searchInField(msg.key);
+        case 'value':
+          return searchInField(msg.value);
+        case 'all':
+        default:
+          return searchInField(msg.key) || searchInField(msg.value);
+      }
+    });
+  }, [messages, searchQuery, searchField, useRegex, caseSensitive]);
 
   // t('consumer.export')数据 - 使用文件选择对话框
   const exportMessages = async (format: 'json' | 'csv' = 'json') => {
@@ -1228,6 +1275,75 @@ export function ConsumerPage() {
       {/* 预览模式：表头和消息列表 */}
       {consumerConfig.mode === 'preview' && (
         <>
+          {/* 搜索过滤栏 */}
+          {messages.length > 0 && (
+            <div className="flex-shrink-0 px-3 py-2 bg-muted/30 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('consumer.searchPlaceholder') || 'Search in messages...'}
+                    className="w-full h-8 px-3 pl-9 text-sm border border-border rounded bg-background"
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                
+                <select
+                  value={searchField}
+                  onChange={(e) => setSearchField(e.target.value as 'all' | 'key' | 'value')}
+                  className="h-8 px-2 text-sm border border-border rounded bg-background"
+                >
+                  <option value="all">{t('consumer.searchFields.all') || 'All'}</option>
+                  <option value="key">{t('consumer.searchFields.key') || 'Key'}</option>
+                  <option value="value">{t('consumer.searchFields.value') || 'Value'}</option>
+                </select>
+                
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={useRegex}
+                    onChange={(e) => setUseRegex(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  {t('consumer.useRegex') || 'Regex'}
+                </label>
+                
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={caseSensitive}
+                    onChange={(e) => setCaseSensitive(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  {t('consumer.caseSensitive') || 'Aa'}
+                </label>
+                
+                {searchQuery && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {filteredMessages.length} / {messages.length}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 表头 */}
           <div className="flex-shrink-0 grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
             <span></span>
@@ -1258,13 +1374,17 @@ export function ConsumerPage() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 {isConsuming ? t('consumer.waiting') : t('consumer.clickToStart')}
               </div>
+            ) : filteredMessages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                {t('consumer.noSearchResults') || 'No messages match your search'}
+              </div>
             ) : (
               <div>
-                {messages.map((msg, idx) => (
+                {filteredMessages.map((msg, idx) => (
                   <MessageItem
                     key={`${msg.partition}-${msg.offset}-${idx}`}
                     msg={msg}
-                    index={idx}
+                    index={messages.indexOf(msg)}
                   />
                 ))}
                 <div ref={messagesEndRef} className="h-4" />

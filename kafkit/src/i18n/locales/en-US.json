@@ -253,7 +253,16 @@
     "alerts": {
       "startFailed": "Failed to start consuming",
       "exportFailed": "Export failed"
-    }
+    },
+    "searchPlaceholder": "Search in messages...",
+    "searchFields": {
+      "all": "All",
+      "key": "Key",
+      "value": "Value"
+    },
+    "useRegex": "Regex",
+    "caseSensitive": "Match case",
+    "noSearchResults": "No messages match your search"
   },
   "consumerGroups": {
     "title": "Consumer Groups",

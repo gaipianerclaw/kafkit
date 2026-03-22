@@ -253,7 +253,16 @@
     "alerts": {
       "startFailed": "启动消费失败",
       "exportFailed": "导出失败"
-    }
+    },
+    "searchPlaceholder": "搜索消息内容...",
+    "searchFields": {
+      "all": "全部",
+      "key": "Key",
+      "value": "Value"
+    },
+    "useRegex": "正则",
+    "caseSensitive": "区分大小写",
+    "noSearchResults": "没有匹配的消息"
   },
   "consumerGroups": {
     "title": "Consumer Groups",
