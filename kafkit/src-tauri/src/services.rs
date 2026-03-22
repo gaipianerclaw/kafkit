@@ -16,7 +16,6 @@ use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::client::DefaultClientContext;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
-use rdkafka::consumer::CommitMode;
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
@@ -751,7 +750,7 @@ impl ConnectionManager {
             }
         };
         
-        let mut topic_partitions: Vec<(String, i32)> = Vec::new();
+        let _topic_partitions: Vec<(String, i32)> = Vec::new();
         
         for group in groups.groups() {
             if group.name() != group_id {
@@ -846,14 +845,55 @@ impl ConnectionManager {
     ) -> Result<Vec<PartitionOffsetResult>, AppError> {
         println!("[Kafkit] Resetting offset for group: {}, topic: {:?}", group_id, topic);
         
-        // 创建 AdminClient 用于执行偏移量重置
-        let admin_config = Self::create_client_config(connection)?;
-        let admin: AdminClient<DefaultClientContext> = admin_config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+        // 创建消费者配置 - 使用要重置的消费组 group.id
+        let mut config = ClientConfig::new();
+        config.set("bootstrap.servers", &connection.bootstrap_servers.join(","));
+        config.set("group.id", group_id);  // 关键：使用目标消费组 ID
+        config.set("client.id", &format!("kafkit-reset-{}", group_id));
+        config.set("enable.auto.commit", "false");
         
-        // 创建临时消费者用于获取 offset 信息
-        let consumer_config = Self::create_client_config(connection)?;
-        let consumer: BaseConsumer = consumer_config.create()
+        // 根据安全协议配置
+        match connection.security.protocol {
+            SecurityProtocol::Plaintext => {
+                config.set("security.protocol", "PLAINTEXT");
+            }
+            SecurityProtocol::Ssl => {
+                config.set("security.protocol", "SSL");
+                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
+                    if let Some(ca_path) = ca_cert {
+                        config.set("ssl.ca.location", ca_path);
+                    }
+                    if let Some(cert_path) = client_cert {
+                        config.set("ssl.certificate.location", cert_path);
+                    }
+                    if let Some(key_path) = client_key {
+                        config.set("ssl.key.location", key_path);
+                    }
+                }
+            }
+            SecurityProtocol::SaslPlaintext => {
+                config.set("security.protocol", "SASL_PLAINTEXT");
+                Self::configure_sasl(&mut config, &connection.auth)?;
+            }
+            SecurityProtocol::SaslSsl => {
+                config.set("security.protocol", "SASL_SSL");
+                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
+                    if let Some(ca_path) = ca_cert {
+                        config.set("ssl.ca.location", ca_path);
+                    }
+                    if let Some(cert_path) = client_cert {
+                        config.set("ssl.certificate.location", cert_path);
+                    }
+                    if let Some(key_path) = client_key {
+                        config.set("ssl.key.location", key_path);
+                    }
+                }
+                Self::configure_sasl(&mut config, &connection.auth)?;
+            }
+        }
+        
+        // 创建消费者
+        let consumer: BaseConsumer = config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
         
         // 获取目标分区列表
@@ -875,25 +915,25 @@ impl ConnectionManager {
             return Err(AppError::KafkaError(format!("No partitions found for topic: {}", topic)));
         }
         
-        // 计算每个分区的目标 offset
-        let mut partitions_to_reset: Vec<(i32, i64)> = Vec::new();
+        // 计算每个分区的目标 offset 并执行 seek
+        let mut reset_results = Vec::new();
         
-        for p in &target_partitions {
+        for p in target_partitions {
             let target_offset = match reset_to {
                 OffsetResetSpec::Earliest => {
-                    let (low, _) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
+                    let (low, _) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     low
                 }
                 OffsetResetSpec::Latest => {
-                    let (_, high) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
+                    let (_, high) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     high
                 }
                 OffsetResetSpec::Timestamp { timestamp } => {
                     // 通过时间戳查找 offset
                     let mut tpl = TopicPartitionList::new();
-                    tpl.add_partition_offset(topic, *p, KafkaOffset::Offset(*timestamp))
+                    tpl.add_partition_offset(topic, p, KafkaOffset::Offset(*timestamp))
                         .map_err(|e| AppError::KafkaError(format!("Failed to add partition: {}", e)))?;
                     
                     let offsets = consumer.offsets_for_times(tpl, Duration::from_secs(10))
@@ -905,7 +945,7 @@ impl ConnectionManager {
                         .filter(|&o| o >= 0)
                         .unwrap_or_else(|| {
                             // 如果时间戳查找失败，使用 earliest
-                            let (low, _) = consumer.fetch_watermarks(topic, *p, Duration::from_secs(5))
+                            let (low, _) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
                                 .unwrap_or((0, 0));
                             low
                         })
@@ -913,58 +953,32 @@ impl ConnectionManager {
                 OffsetResetSpec::Offset { offset } => *offset,
             };
             
-            println!("[Kafkit] Will reset {}-{} to offset {}", topic, p, target_offset);
-            partitions_to_reset.push((*p, target_offset));
-        }
-        
-        // 使用 AdminClient 执行偏移量重置
-        let mut group_offsets: Vec<rdkafka::admin::GroupOffset> = Vec::new();
-        
-        for (partition, offset) in &partitions_to_reset {
-            let mut tpl = TopicPartitionList::new();
-            tpl.add_partition_offset(topic, *partition, KafkaOffset::Offset(*offset))
-                .map_err(|e| AppError::KafkaError(format!("Failed to add partition to TPL: {}", e)))?;
+            println!("[Kafkit] Resetting {}-{} to offset {}", topic, p, target_offset);
             
-            // 为每个分区创建一个 GroupOffset
-            for el in tpl.elements() {
-                group_offsets.push(rdkafka::admin::GroupOffset {
-                    group: group_id.to_string(),
-                    topic: el.topic().to_string(),
-                    partition: el.partition(),
-                    offset: offset.to_owned(),
-                });
-            }
-        }
-        
-        // 执行偏移量重置
-        let opts = AdminOptions::new();
-        let results = admin.alter_consumer_group_offsets(group_offsets, &opts)
-            .await
-            .map_err(|e| AppError::KafkaError(format!("Failed to alter consumer group offsets: {}", e)))?;
-        
-        // 收集结果
-        let mut reset_results = Vec::new();
-        for result in results {
-            match result {
-                Ok(offset) => {
-                    println!("[Kafkit] Successfully reset offset for {}-{} to {}", 
-                        offset.topic, offset.partition, offset.offset);
+            // 创建 TopicPartitionList 用于 commit
+            let mut tpl = TopicPartitionList::new();
+            tpl.add_partition_offset(topic, p, KafkaOffset::Offset(target_offset))
+                .map_err(|e| AppError::KafkaError(format!("Failed to add partition: {}", e)))?;
+            
+            // 提交偏移量 - 这会重置消费组的偏移量
+            match consumer.commit(&tpl, rdkafka::consumer::CommitMode::Sync) {
+                Ok(_) => {
+                    println!("[Kafkit] Successfully reset offset for {}-{} to {}", topic, p, target_offset);
                     reset_results.push(PartitionOffsetResult {
-                        topic: offset.topic,
-                        partition: offset.partition,
-                        offset: offset.offset,
+                        topic: topic.to_string(),
+                        partition: p,
+                        offset: target_offset,
                         success: true,
                         error: None,
                     });
                 }
-                Err((group_offset, err)) => {
-                    let error_msg = format!("Failed to reset offset for {}-{}: {}", 
-                        group_offset.topic, group_offset.partition, err);
+                Err(e) => {
+                    let error_msg = format!("Failed to reset offset for {}-{}: {}", topic, p, e);
                     println!("[Kafkit] {}", error_msg);
                     reset_results.push(PartitionOffsetResult {
-                        topic: group_offset.topic,
-                        partition: group_offset.partition,
-                        offset: group_offset.offset,
+                        topic: topic.to_string(),
+                        partition: p,
+                        offset: target_offset,
                         success: false,
                         error: Some(error_msg),
                     });
@@ -987,7 +1001,6 @@ impl ConnectionManager {
     }
 }
 
-use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc as StdArc;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import * as mockService from '../../services/mockTauriService';
+import * as mockService from '../services/mockTauriService';
 import type { ConnectionConfig } from '../../types';
 
 describe('Mock Tauri Service', () => {

@@ -248,12 +248,12 @@ pub async fn stop_consuming(
 
 #[tauri::command]
 pub async fn fetch_messages(
-    connection_id: String,
+    _connection_id: String,
     topic: String,
     partition: i32,
     offset: i64,
-    limit: i32,
-    state: State<'_, AppState>,
+    _limit: i32,
+    _state: State<'_, AppState>,
 ) -> Result<serde_json::Value> {
     println!("[Kafkit] Fetch messages from {} partition {} offset {}", topic, partition, offset);
     // TODO: 实现真实的消息获取
