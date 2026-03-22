@@ -15,6 +15,14 @@
   - 支持中英双语界面
   - 集成到连接管理页面
 
+- **修复 Consumer Group Lag 查询稳定性**
+  - 修复 `UnknownGroup` 错误处理，避免查询失败
+  - 添加消费组存在性检查
+  - 实现带重试的 committed offsets 获取
+  - 添加分区去重，避免重复计算
+  - 分批处理分区，减少单次请求负载
+  - 结果按 topic 和 partition 排序
+
 - **Consumer Group 偏移量重置功能真正实现**
   - 支持重置到最早偏移量 (Earliest)
   - 支持重置到最新偏移量 (Latest)

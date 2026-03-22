@@ -741,97 +741,164 @@ impl ConnectionManager {
         
         let client = self.get_client(connection).await?;
         
-        // 获取消费组信息 - 使用较短的超时时间
-        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(5)) {
+        // 首先检查消费组是否存在 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(Some(&[group_id]), Duration::from_secs(3)) {
             Ok(g) => g,
             Err(e) => {
+                let error_msg = format!("{}", e);
+                // 处理 UnknownGroup 错误
+                if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                    println!("[Kafkit] Consumer group '{}' not found or expired", group_id);
+                    return Ok(vec![]);
+                }
                 println!("[Kafkit] Failed to fetch group info: {}", e);
                 return Ok(vec![]);
             }
         };
         
-        let _topic_partitions: Vec<(String, i32)> = Vec::new();
-        
-        for group in groups.groups() {
-            if group.name() != group_id {
-                continue;
-            }
-            
-            // 获取该 group 消费的所有 topic-partition
-            for member in group.members() {
-                if let Some(_assignment) = member.assignment() {
-                    // assignment 是 Vec<u8> 类型，包含序列化的数据
-                    let assignment_data: &[u8] = _assignment.as_ref();
-                    if assignment_data.len() >= 4 {
-                        println!("[Kafkit] Member {} has assignment of {} bytes", member.id(), assignment_data.len());
-                    }
-                }
-            }
+        // 检查消费组是否存在
+        let group_exists = groups.groups().iter().any(|g| g.name() == group_id);
+        if !group_exists {
+            println!("[Kafkit] Consumer group '{}' does not exist", group_id);
+            return Ok(vec![]);
         }
         
-        // 如果没有从 assignment 获取到分区，尝试从 committed offsets 获取
         let mut result = Vec::new();
+        let mut processed_partitions = std::collections::HashSet::new();
         
-        // 尝试获取所有 topics 的 committed offsets
-        let metadata = client.fetch_metadata(None, Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
+        // 获取集群元数据
+        let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
+            Ok(m) => m,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch metadata: {}", e);
+                return Ok(vec![]);
+            }
+        };
         
+        // 为每个 topic 获取 committed offsets
         for topic in metadata.topics() {
             let topic_name = topic.name();
+            let partitions: Vec<i32> = topic.partitions().iter().map(|p| p.id()).collect();
             
-            // 构建 TopicPartitionList
-            let mut tpl = TopicPartitionList::new();
-            for partition in topic.partitions() {
-                tpl.add_partition(topic_name, partition.id());
-            }
-            
-            if tpl.count() == 0 {
+            if partitions.is_empty() {
                 continue;
             }
             
-            // 获取 committed offsets
-            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
-                Ok(committed) => {
-                    // 遍历 committed offsets - 使用 elements() 方法
-                    for el in committed.elements() {
-                        let topic: &str = el.topic();
-                        let partition: i32 = el.partition();
-                        let offset = el.offset();
-                        
-                        // 获取 log end offset
-                        match client.fetch_watermarks(topic, partition, Duration::from_secs(5)) {
-                            Ok((_, high)) => {
-                                let current_offset = offset.to_raw().unwrap_or(-1);
-                                let lag = if current_offset >= 0 {
-                                    high.saturating_sub(current_offset)
-                                } else {
-                                    high
-                                };
-                                
-                                if current_offset >= 0 || lag > 0 {
-                                    result.push(PartitionLag {
-                                        topic: topic.to_string(),
-                                        partition,
-                                        current_offset,
-                                        log_end_offset: high,
-                                        lag,
-                                    });
+            // 分批处理分区，避免一次请求过多
+            for chunk in partitions.chunks(10) {
+                let mut tpl = TopicPartitionList::new();
+                for &partition in chunk {
+                    tpl.add_partition(topic_name, partition);
+                }
+                
+                // 获取 committed offsets，带重试逻辑
+                let committed = match Self::fetch_committed_with_retry(&client, &tpl, 3).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let error_msg = format!("{}", e);
+                        if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                            println!("[Kafkit] Group '{}' expired during query", group_id);
+                            return Ok(result); // 返回已获取的数据
+                        }
+                        println!("[Kafkit] Failed to fetch committed offsets for {}: {}", topic_name, e);
+                        continue;
+                    }
+                };
+                
+                // 处理 committed offsets
+                for el in committed.elements() {
+                    let partition = el.partition();
+                    let offset = el.offset();
+                    let partition_key = format!("{}:{}", topic_name, partition);
+                    
+                    // 避免重复处理
+                    if processed_partitions.contains(&partition_key) {
+                        continue;
+                    }
+                    processed_partitions.insert(partition_key);
+                    
+                    // 获取 log end offset
+                    match client.fetch_watermarks(topic_name, partition, Duration::from_secs(5)) {
+                        Ok((_, high)) => {
+                            let current_offset = match offset {
+                                rdkafka::Offset::Offset(o) => o,
+                                rdkafka::Offset::End => high,
+                                rdkafka::Offset::Beginning => 0,
+                                _ => {
+                                    // 对于 Invalid/Stored 等状态，尝试获取水印
+                                    println!("[Kafkit] Unusual offset state for {}-{}: {:?}", topic_name, partition, offset);
+                                    -1
                                 }
+                            };
+                            
+                            let lag = if current_offset >= 0 {
+                                high.saturating_sub(current_offset)
+                            } else {
+                                high
+                            };
+                            
+                            // 只添加有实际消费记录或存在 lag 的分区
+                            if current_offset >= 0 || lag > 0 {
+                                result.push(PartitionLag {
+                                    topic: topic_name.to_string(),
+                                    partition,
+                                    current_offset,
+                                    log_end_offset: high,
+                                    lag,
+                                });
                             }
-                            Err(e) => {
-                                println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic, partition, e);
-                            }
+                        }
+                        Err(e) => {
+                            println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic_name, partition, e);
                         }
                     }
                 }
+            }
+        }
+        
+        // 按 topic 和 partition 排序
+        result.sort_by(|a, b| {
+            match a.topic.cmp(&b.topic) {
+                std::cmp::Ordering::Equal => a.partition.cmp(&b.partition),
+                other => other,
+            }
+        });
+        
+        println!("[Kafkit] Found {} partitions with lag info for group '{}'", result.len(), group_id);
+        Ok(result)
+    }
+    
+    /// 带重试的获取 committed offsets
+    async fn fetch_committed_with_retry(
+        client: &rdkafka::client::Client,
+        tpl: &TopicPartitionList,
+        max_retries: u32,
+    ) -> Result<TopicPartitionList, rdkafka::error::KafkaError> {
+        let mut last_error = None;
+        
+        for attempt in 1..=max_retries {
+            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
+                Ok(result) => return Ok(result),
                 Err(e) => {
-                    println!("[Kafkit] Failed to fetch committed offsets for topic {}: {}", topic_name, e);
+                    let error_msg = format!("{}", e);
+                    // 对于 UnknownGroup 错误，不需要重试
+                    if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                        return Err(e);
+                    }
+                    
+                    println!("[Kafkit] Retry {}/{} for committed offsets: {}", attempt, max_retries, e);
+                    last_error = Some(e);
+                    
+                    if attempt < max_retries {
+                        tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
+                    }
                 }
             }
         }
         
-        println!("[Kafkit] Found {} partitions with lag info", result.len());
-        Ok(result)
+        Err(last_error.unwrap_or_else(|| {
+            rdkafka::error::KafkaError::ClientCreation("Max retries exceeded".to_string())
+        }))
     }
         
     /// 重置 Consumer Group 的 Offset
