@@ -16,6 +16,7 @@ import type {
   TopicDetail,
   TopicInfo,
   OffsetSpec,
+  ConfigEntry,
 } from '../types';
 
 // ================= 连接管理 =================
@@ -88,6 +89,20 @@ export async function createTopic(
 
 export async function deleteTopic(connectionId: string, topic: string): Promise<void> {
   return invoke('delete_topic', { connectionId, topic });
+}
+
+// ================= Topic 配置管理 =================
+
+export async function getTopicConfigs(connectionId: string, topic: string): Promise<ConfigEntry[]> {
+  return invoke('get_topic_configs', { connectionId, topic });
+}
+
+export async function updateTopicConfigs(
+  connectionId: string,
+  topic: string,
+  configs: Record<string, string>
+): Promise<void> {
+  return invoke('update_topic_configs', { connectionId, topic, configs });
 }
 
 // ================= 消息消费 =================

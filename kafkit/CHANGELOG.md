@@ -23,6 +23,13 @@
   - 分批处理分区，减少单次请求负载
   - 结果按 topic 和 partition 排序
 
+- **添加 Topic 配置编辑功能**
+  - 后端实现 `describe_topic_configs` 和 `alter_topic_configs`
+  - 前端添加配置编辑对话框
+  - 支持常用配置快速编辑（retention.ms, cleanup.policy 等）
+  - 支持自定义配置项添加
+  - 配置列表实时更新显示
+
 - **Consumer Group 偏移量重置功能真正实现**
   - 支持重置到最早偏移量 (Earliest)
   - 支持重置到最新偏移量 (Latest)

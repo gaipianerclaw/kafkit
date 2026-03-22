@@ -209,6 +209,51 @@ pub async fn delete_topic(
     state.connection_manager.delete_topic(&connection, &topic).await
 }
 
+// ================= Topic 配置编辑 =================
+
+#[tauri::command]
+pub async fn get_topic_configs(
+    connection_id: String,
+    topic: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ConfigEntry>> {
+    println!("[Kafkit] Getting topic configs for: {}", topic);
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 获取 topic 配置
+    state.connection_manager.describe_topic_configs(&connection, &topic).await
+}
+
+#[tauri::command]
+pub async fn update_topic_configs(
+    connection_id: String,
+    topic: String,
+    configs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<()> {
+    println!("[Kafkit] Updating topic configs for: {}", topic);
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 修改 topic 配置
+    state.connection_manager.alter_topic_configs(&connection, &topic, configs).await
+}
+
 #[tauri::command]
 pub async fn start_consuming(
     connection_id: String,

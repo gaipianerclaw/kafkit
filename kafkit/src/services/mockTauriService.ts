@@ -15,6 +15,7 @@ import type {
   ProduceResult,
   TopicDetail,
   TopicInfo,
+  ConfigEntry,
 } from '../types';
 
 // 模拟延迟
@@ -312,6 +313,62 @@ export async function resetConsumerOffset(
   _resetTo: { type: string; timestamp?: number; offset?: number }
 ): Promise<void> {
   await delay(500);
+}
+
+// ================= Topic 配置 Mock =================
+
+const mockConfigs: Record<string, ConfigEntry[]> = {
+  'user-events': [
+    { name: 'retention.ms', value: '604800000', default: false, source: 'DYNAMIC_TOPIC_CONFIG' },
+    { name: 'cleanup.policy', value: 'delete', default: true, source: 'DEFAULT_CONFIG' },
+    { name: 'segment.bytes', value: '1073741824', default: true, source: 'DEFAULT_CONFIG' },
+  ],
+  'order-events': [
+    { name: 'retention.ms', value: '86400000', default: false, source: 'DYNAMIC_TOPIC_CONFIG' },
+    { name: 'cleanup.policy', value: 'delete', default: true, source: 'DEFAULT_CONFIG' },
+    { name: 'min.insync.replicas', value: '2', default: false, source: 'DYNAMIC_TOPIC_CONFIG' },
+  ],
+};
+
+export async function getTopicConfigs(_connectionId: string, topic: string): Promise<ConfigEntry[]> {
+  await delay(300);
+  return mockConfigs[topic] || [
+    { name: 'cleanup.policy', value: 'delete', default: true, source: 'DEFAULT_CONFIG' },
+    { name: 'retention.ms', value: '604800000', default: true, source: 'DEFAULT_CONFIG' },
+  ];
+}
+
+export async function updateTopicConfigs(
+  _connectionId: string,
+  topic: string,
+  configs: Record<string, string>
+): Promise<void> {
+  await delay(600);
+  
+  // 更新 mock 配置
+  const existingConfigs = mockConfigs[topic] || [];
+  const updatedConfigs = [...existingConfigs];
+  
+  Object.entries(configs).forEach(([key, value]) => {
+    const existingIndex = updatedConfigs.findIndex(c => c.name === key);
+    if (existingIndex >= 0) {
+      updatedConfigs[existingIndex] = {
+        ...updatedConfigs[existingIndex],
+        value,
+        default: false,
+        source: 'DYNAMIC_TOPIC_CONFIG',
+      };
+    } else {
+      updatedConfigs.push({
+        name: key,
+        value,
+        default: false,
+        source: 'DYNAMIC_TOPIC_CONFIG',
+      });
+    }
+  });
+  
+  mockConfigs[topic] = updatedConfigs;
 }
 
 // ================= 事件监听 Mock =================

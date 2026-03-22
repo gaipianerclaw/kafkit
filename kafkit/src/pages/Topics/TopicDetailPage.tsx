@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Send, Download, Info, BarChart3 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Send, Download, Info, BarChart3, Settings2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
-import type { TopicDetail } from '../../types';
+import type { TopicDetail, ConfigEntry } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 // 检测是否在 Tauri 环境中
@@ -25,10 +25,16 @@ export function TopicDetailPage() {
   const { t } = useTranslation();
   const { topic } = useParams();
   const { activeConnection } = useConnectionStore();
-  
+
   const [detail, setDetail] = useState<TopicDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 配置编辑相关状态
+  const [configs, setConfigs] = useState<ConfigEntry[]>([]);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [editingConfigs, setEditingConfigs] = useState<Record<string, string>>({});
+  const [savingConfigs, setSavingConfigs] = useState(false);
 
   useEffect(() => {
     if (activeConnection && topic) {
@@ -38,7 +44,7 @@ export function TopicDetailPage() {
 
   const fetchTopicDetail = async () => {
     if (!activeConnection || !topic) return;
-    
+
     console.log('[Kafkit] Fetching topic detail for:', decodeURIComponent(topic));
     setLoading(true);
     setError(null);
@@ -47,11 +53,69 @@ export function TopicDetailPage() {
       const data = await tauriService.getTopicDetail(activeConnection, decodeURIComponent(topic));
       console.log('[Kafkit] Topic detail:', data);
       setDetail(data);
+
+      // 同时获取配置
+      await fetchTopicConfigs();
     } catch (err) {
       console.error('[Kafkit] Failed to fetch topic detail:', err);
       setError(err instanceof Error ? err.message : t('topics.loadError'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 获取 Topic 配置
+  const fetchTopicConfigs = async () => {
+    if (!activeConnection || !topic) return;
+
+    try {
+      const tauriService = await getService();
+      const configData = await tauriService.getTopicConfigs(activeConnection, decodeURIComponent(topic));
+      setConfigs(configData);
+    } catch (err) {
+      console.error('[Kafkit] Failed to fetch topic configs:', err);
+    }
+  };
+
+  // 打开配置编辑对话框
+  const openConfigDialog = () => {
+    const configMap: Record<string, string> = {};
+    configs.forEach(c => {
+      configMap[c.name] = c.value;
+    });
+    // 添加常用配置项的默认值
+    if (!configMap['retention.ms']) configMap['retention.ms'] = '';
+    if (!configMap['cleanup.policy']) configMap['cleanup.policy'] = '';
+    if (!configMap['min.insync.replicas']) configMap['min.insync.replicas'] = '';
+    if (!configMap['max.message.bytes']) configMap['max.message.bytes'] = '';
+    setEditingConfigs(configMap);
+    setShowConfigDialog(true);
+  };
+
+  // 保存配置
+  const saveConfigs = async () => {
+    if (!activeConnection || !topic) return;
+
+    setSavingConfigs(true);
+    try {
+      const tauriService = await getService();
+
+      // 过滤掉空值的配置
+      const configsToSave: Record<string, string> = {};
+      Object.entries(editingConfigs).forEach(([key, value]) => {
+        if (value && value.trim() !== '') {
+          configsToSave[key] = value.trim();
+        }
+      });
+
+      await tauriService.updateTopicConfigs(activeConnection, decodeURIComponent(topic), configsToSave);
+      setShowConfigDialog(false);
+      await fetchTopicConfigs(); // 刷新配置列表
+    } catch (err) {
+      console.error('[Kafkit] Failed to update topic configs:', err);
+      alert(t('topicDetail.configUpdateFailed') || 'Failed to update configs');
+    } finally {
+      setSavingConfigs(false);
     }
   };
 
@@ -62,7 +126,7 @@ export function TopicDetailPage() {
     totalPartitions: detail.partitions.length,
     totalMessages: detail.partitions.reduce((sum, p) => sum + p.messageCount, 0),
     totalReplicas: detail.partitions.reduce((sum, p) => sum + p.replicas.length, 0),
-    avgReplicationFactor: detail.partitions.length > 0 
+    avgReplicationFactor: detail.partitions.length > 0
       ? (detail.partitions.reduce((sum, p) => sum + p.replicas.length, 0) / detail.partitions.length).toFixed(1)
       : '0',
   } : null;
@@ -82,16 +146,24 @@ export function TopicDetailPage() {
             {!loading && <RefreshCw className="w-4 h-4 mr-2" />}
             {t('common.refresh')}
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openConfigDialog}
+          >
+            <Settings2 className="w-4 h-4 mr-2" />
+            {t('topicDetail.editConfigs') || 'Edit Configs'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => navigate(`/main/topics/${topic}/consume`)}
           >
             <Download className="w-4 h-4 mr-2" />
             {t('topics.consume')}
           </Button>
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             onClick={() => navigate(`/main/topics/${topic}/produce`)}
           >
             <Send className="w-4 h-4 mr-2" />
@@ -203,10 +275,14 @@ export function TopicDetailPage() {
             </div>
 
             {/* Configs */}
-            {detail.configs.length > 0 && (
+            {configs.length > 0 && (
               <div className="bg-card border border-border rounded-lg">
-                <div className="px-4 py-3 border-b border-border">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <h2 className="font-medium">{t('topicDetail.configs')}</h2>
+                  <Button variant="ghost" size="sm" onClick={openConfigDialog}>
+                    <Settings2 className="w-4 h-4 mr-2" />
+                    {t('topicDetail.editConfigs') || 'Edit'}
+                  </Button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -218,7 +294,7 @@ export function TopicDetailPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {detail.configs.map(c => (
+                      {configs.map(c => (
                         <tr key={c.name} className="hover:bg-muted/50">
                           <td className="px-4 py-2 text-sm font-mono">{c.name}</td>
                           <td className="px-4 py-2 text-sm">{c.value}</td>
@@ -239,6 +315,142 @@ export function TopicDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Config Edit Dialog */}
+      {showConfigDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg w-[600px] max-h-[80vh] flex flex-col">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+              <h2 className="font-medium">{t('topicDetail.editConfigs') || 'Edit Topic Configs'}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowConfigDialog(false)}>
+                ✕
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 space-y-4">
+              {/* Common Configs */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-muted-foreground">{t('topicDetail.commonConfigs') || 'Common Configs'}</h3>
+                
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">retention.ms</label>
+                  <input
+                    type="text"
+                    value={editingConfigs['retention.ms'] || ''}
+                    onChange={(e) => setEditingConfigs({ ...editingConfigs, 'retention.ms': e.target.value })}
+                    placeholder="604800000 (7 days)"
+                    className="w-full px-3 py-2 text-sm border border-border rounded bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{t('topicDetail.retentionHint') || 'Data retention time in milliseconds'}</p>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">cleanup.policy</label>
+                  <select
+                    value={editingConfigs['cleanup.policy'] || ''}
+                    onChange={(e) => setEditingConfigs({ ...editingConfigs, 'cleanup.policy': e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-border rounded bg-background"
+                  >
+                    <option value="">{t('common.select') || 'Select...'}</option>
+                    <option value="delete">delete</option>
+                    <option value="compact">compact</option>
+                    <option value="delete,compact">delete,compact</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">min.insync.replicas</label>
+                  <input
+                    type="text"
+                    value={editingConfigs['min.insync.replicas'] || ''}
+                    onChange={(e) => setEditingConfigs({ ...editingConfigs, 'min.insync.replicas': e.target.value })}
+                    placeholder="1"
+                    className="w-full px-3 py-2 text-sm border border-border rounded bg-background"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">max.message.bytes</label>
+                  <input
+                    type="text"
+                    value={editingConfigs['max.message.bytes'] || ''}
+                    onChange={(e) => setEditingConfigs({ ...editingConfigs, 'max.message.bytes': e.target.value })}
+                    placeholder="1048588"
+                    className="w-full px-3 py-2 text-sm border border-border rounded bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Custom Configs */}
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('topicDetail.otherConfigs') || 'Other Configs'}</h3>
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {Object.entries(editingConfigs)
+                    .filter(([key]) => !['retention.ms', 'cleanup.policy', 'min.insync.replicas', 'max.message.bytes'].includes(key))
+                    .map(([key, value]) => (
+                      <div key={key} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={key}
+                          readOnly
+                          className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-muted"
+                        />
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => setEditingConfigs({ ...editingConfigs, [key]: e.target.value })}
+                          className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-background"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const { [key]: _, ...rest } = editingConfigs;
+                            setEditingConfigs(rest);
+                          }}
+                          className="text-destructive"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+                
+                {/* Add custom config */}
+                <div className="flex gap-2 mt-3">
+                  <input
+                    type="text"
+                    id="newConfigKey"
+                    placeholder={t('topicDetail.configName') || 'Config name'}
+                    className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-background"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const keyInput = document.getElementById('newConfigKey') as HTMLInputElement;
+                      const key = keyInput.value.trim();
+                      if (key && !editingConfigs[key]) {
+                        setEditingConfigs({ ...editingConfigs, [key]: '' });
+                        keyInput.value = '';
+                      }
+                    }}
+                  >
+                    {t('common.add') || 'Add'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={saveConfigs} isLoading={savingConfigs}>
+                {t('common.save')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

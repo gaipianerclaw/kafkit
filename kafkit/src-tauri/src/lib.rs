@@ -66,6 +66,8 @@ pub fn run() {
             get_topic_detail,
             create_topic,
             delete_topic,
+            get_topic_configs,
+            update_topic_configs,
             // Consumer
             start_consuming,
             stop_consuming,

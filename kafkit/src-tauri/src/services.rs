@@ -545,6 +545,111 @@ impl ConnectionManager {
         Ok(())
     }
 
+    /// 修改 Topic 配置
+    pub async fn alter_topic_configs(
+        &self,
+        connection: &Connection,
+        topic_name: &str,
+        configs: std::collections::HashMap<String, String>,
+    ) -> Result<(), AppError> {
+        println!("[Kafkit] Altering configs for topic: {}", topic_name);
+
+        // 创建 AdminClient 配置
+        let admin_config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = admin_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 构建配置资源
+        use rdkafka::admin::{AlterConfig, ConfigResource, ResourceSpecifier};
+        
+        let mut config_entries: Vec<(String, String)> = configs.into_iter().collect();
+        
+        // 使用 AlterConfig 构建器
+        let alter_config = AlterConfig::new(
+            ResourceSpecifier::Topic(topic_name.to_string()),
+            config_entries.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
+        );
+
+        // 执行配置修改
+        let opts = AdminOptions::new();
+        let results = admin.alter_configs(&[alter_config], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to alter topic configs: {}", e)))?;
+
+        // 检查结果
+        for result in results {
+            match result {
+                Ok(resource) => {
+                    println!("[Kafkit] Successfully altered configs for: {:?}", resource);
+                }
+                Err((resource, err)) => {
+                    let msg = format!("Failed to alter configs for {:?}: {}", resource, err);
+                    println!("[Kafkit] {}", msg);
+                    return Err(AppError::KafkaError(msg));
+                }
+            }
+        }
+
+        println!("[Kafkit] Topic '{}' configs altered successfully", topic_name);
+        Ok(())
+    }
+
+    /// 获取 Topic 配置详情
+    pub async fn describe_topic_configs(
+        &self,
+        connection: &Connection,
+        topic_name: &str,
+    ) -> Result<Vec<ConfigEntry>, AppError> {
+        println!("[Kafkit] Describing configs for topic: {}", topic_name);
+
+        // 创建 AdminClient 配置
+        let admin_config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = admin_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 构建配置资源
+        use rdkafka::admin::{ConfigResource, ResourceSpecifier};
+        
+        let resource = ConfigResource::new(ResourceSpecifier::Topic(topic_name.to_string()));
+
+        // 获取配置
+        let opts = AdminOptions::new();
+        let results = admin.describe_configs(&[resource], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to describe topic configs: {}", e)))?;
+
+        let mut config_entries = Vec::new();
+
+        // 处理结果
+        for result in results {
+            match result {
+                Ok(config_resource) => {
+                    for entry in config_resource.entries {
+                        config_entries.push(ConfigEntry {
+                            name: entry.name.to_string(),
+                            value: entry.value.unwrap_or_default().to_string(),
+                            default: entry.is_default,
+                            source: format!("{:?}", entry.source),
+                        });
+                    }
+                }
+                Err((resource, err)) => {
+                    println!("[Kafkit] Failed to describe configs for {:?}: {}", resource, err);
+                }
+            }
+        }
+
+        // 按名称排序
+        config_entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+        println!("[Kafkit] Found {} config entries for topic '{}'", config_entries.len(), topic_name);
+        Ok(config_entries)
+    }
+
     /// 获取或创建 Producer
     async fn get_producer(&self, connection: &Connection) -> Result<FutureProducer, AppError> {
         let mut producers = self.producers.lock().await;
