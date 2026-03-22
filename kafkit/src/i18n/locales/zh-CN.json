@@ -110,7 +110,14 @@
     "loadError": "加载失败",
     "createError": "创建失败",
     "deleteError": "删除失败",
-    "selectConnection": "请先选择一个连接"
+    "selectConnection": "请先选择一个连接",
+    "import": "导入",
+    "export": "导出",
+    "exportSuccess": "成功导出 {count} 个连接",
+    "exportError": "导出失败",
+    "importResult": "导入完成：成功 {imported} 个，跳过 {skipped} 个",
+    "importErrors": "错误详情",
+    "importError": "导入失败"
   },
   "topicDetail": {
     "title": "Topic 详情",

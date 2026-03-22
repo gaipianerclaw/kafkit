@@ -110,7 +110,14 @@
     "loadError": "Failed to load",
     "createError": "Failed to create",
     "deleteError": "Failed to delete",
-    "selectConnection": "Please select a connection first"
+    "selectConnection": "Please select a connection first",
+    "import": "Import",
+    "export": "Export",
+    "exportSuccess": "Successfully exported {count} connections",
+    "exportError": "Export failed",
+    "importResult": "Import complete: {imported} imported, {skipped} skipped",
+    "importErrors": "Error details",
+    "importError": "Import failed"
   },
   "topicDetail": {
     "title": "Topic Details",

@@ -58,6 +58,9 @@ pub fn run() {
             create_connection,
             update_connection,
             delete_connection,
+            // Connection Import/Export
+            export_connections,
+            import_connections,
             // Topic
             list_topics,
             get_topic_detail,

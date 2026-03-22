@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, Server, ArrowLeft } from 'lucide-react';
+import { Plus, Edit, Trash2, Server, ArrowLeft, Upload, Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
 import { useTranslation } from 'react-i18next';
+import { open } from '@tauri-apps/plugin-dialog';
+import { save } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 
 export function ConnectionListPage() {
   const navigate = useNavigate();
@@ -27,6 +30,62 @@ export function ConnectionListPage() {
   const handleConnect = (id: string) => {
     setActiveConnection(id);
     navigate('/main/topics');
+  };
+
+  // 导出连接配置
+  const handleExport = async () => {
+    try {
+      const filePath = await save({
+        filters: [
+          { name: 'JSON', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        defaultPath: 'kafkit-connections.json'
+      });
+
+      if (filePath) {
+        const count = await invoke<number>('export_connections', {
+          filePath,
+          connectionIds: null // 导出所有连接
+        });
+        alert(t('connections.exportSuccess', { count }) || `成功导出 ${count} 个连接`);
+      }
+    } catch (error) {
+      alert(t('connections.exportError') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
+    }
+  };
+
+  // 导入连接配置
+  const handleImport = async () => {
+    try {
+      const selected = await open({
+        filters: [
+          { name: 'JSON', extensions: ['json'] }
+        ],
+        multiple: false
+      });
+
+      if (selected && typeof selected === 'string') {
+        const result = await invoke<{ imported: number; skipped: number; errors: string[] }>('import_connections', {
+          filePath: selected,
+          skipExisting: true
+        });
+
+        let message = t('connections.importResult', { 
+          imported: result.imported, 
+          skipped: result.skipped 
+        }) || `导入完成：成功 ${result.imported} 个，跳过 ${result.skipped} 个`;
+
+        if (result.errors.length > 0) {
+          message += '\n\n' + t('connections.importErrors') + ':\n' + result.errors.join('\n');
+        }
+
+        alert(message);
+        await fetchConnections(); // 刷新列表
+      }
+    } catch (error) {
+      alert(t('connections.importError') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
+    }
   };
 
   const getAuthTypeLabel = (authType: string) => {
@@ -54,10 +113,20 @@ export function ConnectionListPage() {
               <p className="text-sm text-muted-foreground">{t('connections.manageDesc') || 'Manage Kafka cluster connections'}</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/main/connections/new')}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t('connections.new')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleImport}>
+              <Upload className="w-4 h-4 mr-2" />
+              {t('connections.import') || 'Import'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              {t('connections.export') || 'Export'}
+            </Button>
+            <Button onClick={() => navigate('/main/connections/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              {t('connections.new')}
+            </Button>
+          </div>
         </div>
 
         {/* Connection List */}
