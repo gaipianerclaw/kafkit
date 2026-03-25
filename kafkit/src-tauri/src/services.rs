@@ -238,6 +238,7 @@ impl ConnectionManager {
 
         // 尝试完整的 Kafka 连接验证
         println!("[Kafkit] Testing Kafka protocol connection...");
+        println!("[Kafkit] Security protocol: {:?}", config.security.protocol);
         
         // 创建一个临时连接来测试
         let mut test_config = ClientConfig::new();
@@ -245,40 +246,52 @@ impl ConnectionManager {
         test_config.set("client.id", "kafkit-test");
         test_config.set("socket.timeout.ms", "10000");
         test_config.set("metadata.request.timeout.ms", "10000");
+        // 添加调试日志
+        test_config.set("debug", "security,broker,protocol");
         
         // 根据安全协议添加配置
         match config.security.protocol {
             SecurityProtocol::Plaintext => {
                 test_config.set("security.protocol", "PLAINTEXT");
+                println!("[Kafkit] Using PLAINTEXT (no authentication)");
             }
             SecurityProtocol::Ssl => {
                 test_config.set("security.protocol", "SSL");
+                println!("[Kafkit] Using SSL authentication");
                 if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &config.auth {
                     if let Some(ca_path) = ca_cert {
+                        println!("[Kafkit] SSL CA cert: {}", ca_path);
                         test_config.set("ssl.ca.location", ca_path);
                     }
                     if let Some(cert_path) = client_cert {
+                        println!("[Kafkit] SSL client cert: {}", cert_path);
                         test_config.set("ssl.certificate.location", cert_path);
                     }
                     if let Some(key_path) = client_key {
+                        println!("[Kafkit] SSL client key: {}", key_path);
                         test_config.set("ssl.key.location", key_path);
                     }
                 }
             }
             SecurityProtocol::SaslPlaintext => {
                 test_config.set("security.protocol", "SASL_PLAINTEXT");
+                println!("[Kafkit] Using SASL_PLAINTEXT authentication");
                 Self::configure_sasl_for_test(&mut test_config, &config.auth)?;
             }
             SecurityProtocol::SaslSsl => {
                 test_config.set("security.protocol", "SASL_SSL");
+                println!("[Kafkit] Using SASL_SSL authentication");
                 if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &config.auth {
                     if let Some(ca_path) = ca_cert {
+                        println!("[Kafkit] SSL CA cert: {}", ca_path);
                         test_config.set("ssl.ca.location", ca_path);
                     }
                     if let Some(cert_path) = client_cert {
+                        println!("[Kafkit] SSL client cert: {}", cert_path);
                         test_config.set("ssl.certificate.location", cert_path);
                     }
                     if let Some(key_path) = client_key {
+                        println!("[Kafkit] SSL client key: {}", key_path);
                         test_config.set("ssl.key.location", key_path);
                     }
                 }
@@ -286,11 +299,26 @@ impl ConnectionManager {
             }
         }
         
+        println!("[Kafkit] Creating Kafka client with config...");
         let test_client: BaseConsumer = test_config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create test client: {}", e)))?;
+            .map_err(|e| {
+                println!("[Kafkit] Failed to create test client: {}", e);
+                AppError::KafkaError(format!("Failed to create test client: {}", e))
+            })?;
         
-        test_client.fetch_metadata(None, Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
+        println!("[Kafkit] Client created, fetching metadata...");
+        match test_client.fetch_metadata(None, Duration::from_secs(10)) {
+            Ok(metadata) => {
+                let broker_count = metadata.brokers().len();
+                let topic_count = metadata.topics().len();
+                println!("[Kafkit] Successfully connected! Found {} brokers, {} topics", 
+                    broker_count, topic_count);
+            }
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch metadata: {}", e);
+                return Err(AppError::KafkaError(format!("Failed to fetch metadata: {}", e)));
+            }
+        }
         
         println!("[Kafkit] Kafka connection test successful");
         Ok(())
@@ -299,6 +327,7 @@ impl ConnectionManager {
     fn configure_sasl_for_test(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
             AuthConfig::SaslPlain { username, password } => {
+                println!("[Kafkit] SASL/PLAIN: username={}", username);
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
@@ -308,19 +337,24 @@ impl ConnectionManager {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",
                 };
+                println!("[Kafkit] SASL/SCRAM: mechanism={}, username={}", mechanism_str, username);
                 config.set("sasl.mechanism", mechanism_str);
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
             AuthConfig::SaslGssapi { principal, keytab_path, service_name } => {
+                println!("[Kafkit] SASL/GSSAPI: principal={}, service={}", principal, service_name);
                 config.set("sasl.mechanism", "GSSAPI");
                 config.set("sasl.kerberos.principal", principal);
                 config.set("sasl.kerberos.service.name", service_name);
                 if let Some(keytab) = keytab_path {
+                    println!("[Kafkit] GSSAPI keytab: {}", keytab);
                     config.set("sasl.kerberos.keytab", keytab);
                 }
             }
-            _ => {}
+            _ => {
+                println!("[Kafkit] Warning: No SASL auth config provided");
+            }
         }
         Ok(())
     }

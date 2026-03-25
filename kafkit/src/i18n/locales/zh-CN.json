@@ -106,6 +106,7 @@
     "name": "Topic 名称",
     "partitions": "分区数",
     "replicationFactor": "副本因子",
+    "replicationFactorHint": "注意：副本因子不能超过 broker 数量，单节点请设置为 1",
     "searchPlaceholder": "搜索 Topic...",
     "viewDetail": "查看详情",
     "consume": "消费消息",

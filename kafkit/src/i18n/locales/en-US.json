@@ -106,6 +106,7 @@
     "name": "Topic Name",
     "partitions": "Partitions",
     "replicationFactor": "Replication Factor",
+    "replicationFactorHint": "Note: Cannot exceed broker count. Use 1 for single-node Kafka",
     "searchPlaceholder": "Search topics...",
     "viewDetail": "View Details",
     "consume": "Consume Messages",

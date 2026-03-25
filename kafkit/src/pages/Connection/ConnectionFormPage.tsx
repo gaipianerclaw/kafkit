@@ -43,15 +43,20 @@ export function ConnectionFormPage() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    if (isEdit && id) {
+    if (isEdit && id && !hasLoaded) {
       loadConnection(id);
     }
-  }, [id]);
+  }, [id, hasLoaded, isEdit]);
 
   const loadConnection = async (connId: string) => {
+    if (hasLoaded) return;
+    setHasLoaded(true);
+    
     try {
+      console.log('[Kafkit] Loading connection:', connId);
       // 直接从 API 获取连接详情
       const connection = await getConnection(connId);
       
@@ -65,7 +70,9 @@ export function ConnectionFormPage() {
         security: connection.security || { protocol: 'PLAINTEXT' },
         options: connection.options || {},
       });
+      console.log('[Kafkit] Connection loaded:', connection.name);
     } catch (error) {
+      console.error('[Kafkit] Failed to load connection:', error);
       alert(t('connections.alerts.loadFailed'));
       navigate('/main/connections');
     } finally {
