@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Server, ArrowLeft, Upload, Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -12,19 +12,52 @@ export function ConnectionListPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { connections, fetchConnections, deleteConnection, setActiveConnection } = useConnectionStore();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // 确认对话框状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    name: string;
+  }>({ isOpen: false, id: null, name: '' });
 
   useEffect(() => {
     fetchConnections();
   }, []);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(t('connections.deleteConfirm', { name }))) {
-      try {
-        await deleteConnection(id);
-      } catch (error) {
-        alert(t('common.delete') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
-      }
+  // 打开确认对话框
+  const openDeleteConfirm = (e: React.MouseEvent, id: string, name: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (deletingId === id) return;
+    
+    setConfirmDialog({ isOpen: true, id, name });
+  };
+  
+  // 确认删除
+  const confirmDelete = async () => {
+    if (!confirmDialog.id) return;
+    
+    const id = confirmDialog.id;
+    console.log('[Kafkit] Deleting connection:', id);
+    setDeletingId(id);
+    setConfirmDialog({ isOpen: false, id: null, name: '' });
+    
+    try {
+      await deleteConnection(id);
+      console.log('[Kafkit] Delete successful:', id);
+    } catch (error) {
+      console.error('[Kafkit] Delete failed:', error);
+      alert(t('common.delete') + ': ' + (error instanceof Error ? error.message : t('common.unknownError')));
+    } finally {
+      setDeletingId(null);
     }
+  };
+  
+  // 取消删除
+  const cancelDelete = () => {
+    setConfirmDialog({ isOpen: false, id: null, name: '' });
   };
 
   const handleConnect = (id: string) => {
@@ -181,7 +214,9 @@ export function ConnectionListPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(conn.id, conn.name)}
+                    type="button"
+                    onClick={(e) => openDeleteConfirm(e, conn.id, conn.name)}
+                    disabled={deletingId === conn.id}
                     className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -192,6 +227,31 @@ export function ConnectionListPage() {
           </div>
         )}
       </div>
+      
+      {/* 删除确认对话框 */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 w-96 shadow-lg">
+            <h3 className="text-lg font-semibold mb-2">{t('common.confirm') || '确认'}</h3>
+            <p className="text-muted-foreground mb-6">
+              {t('connections.deleteConfirm', { name: confirmDialog.name })}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={cancelDelete}>
+                {t('common.cancel') || '取消'}
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={confirmDelete}
+                isLoading={deletingId === confirmDialog.id}
+              >
+                {t('common.delete') || '删除'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

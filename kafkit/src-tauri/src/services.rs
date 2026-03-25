@@ -7,8 +7,7 @@ use std::time::Duration;
 
 // rdkafka 客户端
 use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer as KafkaConsumer};
-use rdkafka::consumer::StreamConsumer;
+use rdkafka::consumer::{BaseConsumer, Consumer as KafkaConsumer, StreamConsumer};
 use rdkafka::Message as KafkaMessageTrait;
 use rdkafka::topic_partition_list::TopicPartitionList;
 use rdkafka::Offset as KafkaOffset;
@@ -562,15 +561,15 @@ impl ConnectionManager {
             .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
 
         // 构建配置资源
-        use rdkafka::admin::{AlterConfig, ConfigResource, ResourceSpecifier};
+        use rdkafka::admin::{AlterConfig, ResourceSpecifier};
         
-        let mut config_entries: Vec<(String, String)> = configs.into_iter().collect();
+        // 使用 AlterConfig 构建器 - API: new(specifier) + set(key, value)
+        let mut alter_config = AlterConfig::new(ResourceSpecifier::Topic(topic_name));
         
-        // 使用 AlterConfig 构建器
-        let alter_config = AlterConfig::new(
-            ResourceSpecifier::Topic(topic_name.to_string()),
-            config_entries.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
-        );
+        // 添加配置项
+        for (key, value) in &configs {
+            alter_config = alter_config.set(key.as_str(), value.as_str());
+        }
 
         // 执行配置修改
         let opts = AdminOptions::new();
@@ -611,14 +610,14 @@ impl ConnectionManager {
         let admin: AdminClient<DefaultClientContext> = admin_config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
 
-        // 构建配置资源
-        use rdkafka::admin::{ConfigResource, ResourceSpecifier};
+        // 构建配置资源 - describe_configs 接受 ResourceSpecifier 引用
+        use rdkafka::admin::ResourceSpecifier;
         
-        let resource = ConfigResource::new(ResourceSpecifier::Topic(topic_name.to_string()));
+        let resource_specifier = ResourceSpecifier::Topic(topic_name);
 
         // 获取配置
         let opts = AdminOptions::new();
-        let results = admin.describe_configs(&[resource], &opts)
+        let results = admin.describe_configs(&[resource_specifier], &opts)
             .await
             .map_err(|e| AppError::KafkaError(format!("Failed to describe topic configs: {}", e)))?;
 
@@ -637,8 +636,8 @@ impl ConnectionManager {
                         });
                     }
                 }
-                Err((resource, err)) => {
-                    println!("[Kafkit] Failed to describe configs for {:?}: {}", resource, err);
+                Err(err) => {
+                    println!("[Kafkit] Failed to describe configs: {:?}", err);
                 }
             }
         }
@@ -836,7 +835,41 @@ impl ConnectionManager {
         Ok(result)
     }
 
+    /// 带重试的获取 committed offsets (同步版本，用于 spawn_blocking)
+    fn fetch_committed_with_retry_sync(
+        client: &BaseConsumer,
+        tpl: &TopicPartitionList,
+        max_retries: u32,
+    ) -> Result<TopicPartitionList, rdkafka::error::KafkaError> {
+        let mut last_error = None;
+        
+        for attempt in 1..=max_retries {
+            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    let error_msg = format!("{}", e);
+                    if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                        return Err(e);
+                    }
+                    
+                    println!("[Kafkit] Retry {}/{} for committed offsets: {}", attempt, max_retries, e);
+                    last_error = Some(e);
+                    
+                    if attempt < max_retries {
+                        std::thread::sleep(Duration::from_millis(100 * attempt as u64));
+                    }
+                }
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| {
+            rdkafka::error::KafkaError::ClientCreation("Max retries exceeded".to_string())
+        }))
+    }
+
+
     /// 获取 Consumer Group 的消费延迟 (Lag)
+    /// 内部使用 spawn_blocking 包装，因为 rdkafka 的一些类型不是 Send
     pub async fn get_consumer_lag(
         &self,
         connection: &Connection,
@@ -844,14 +877,31 @@ impl ConnectionManager {
     ) -> Result<Vec<PartitionLag>, AppError> {
         println!("[Kafkit] Getting consumer lag for group: {}", group_id);
         
+        // 克隆必要的数据用于 spawn_blocking
         let client = self.get_client(connection).await?;
+        let group_id = group_id.to_string();
+        
+        // 使用 spawn_blocking 包装同步代码，避免非 Send 类型跨越 await
+        let result = tokio::task::spawn_blocking(move || {
+            Self::get_consumer_lag_sync(&client, &group_id)
+        }).await.map_err(|e| AppError::Other(format!("Task join error: {}", e)))?;
+        
+        result
+    }
+    
+    /// 同步版本的获取 Consumer Lag（用于 spawn_blocking 内部）
+    fn get_consumer_lag_sync(
+        client: &BaseConsumer,
+        group_id: &str,
+    ) -> Result<Vec<PartitionLag>, AppError> {
+        let mut result = Vec::new();
+        let mut processed_partitions = std::collections::HashSet::new();
         
         // 首先检查消费组是否存在 - 使用较短的超时时间
-        let groups = match client.fetch_group_list(Some(&[group_id]), Duration::from_secs(3)) {
+        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(3)) {
             Ok(g) => g,
             Err(e) => {
                 let error_msg = format!("{}", e);
-                // 处理 UnknownGroup 错误
                 if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
                     println!("[Kafkit] Consumer group '{}' not found or expired", group_id);
                     return Ok(vec![]);
@@ -867,9 +917,6 @@ impl ConnectionManager {
             println!("[Kafkit] Consumer group '{}' does not exist", group_id);
             return Ok(vec![]);
         }
-        
-        let mut result = Vec::new();
-        let mut processed_partitions = std::collections::HashSet::new();
         
         // 获取集群元数据
         let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
@@ -897,13 +944,13 @@ impl ConnectionManager {
                 }
                 
                 // 获取 committed offsets，带重试逻辑
-                let committed = match Self::fetch_committed_with_retry(&client, &tpl, 3).await {
+                let committed = match Self::fetch_committed_with_retry_sync(client, &tpl, 3) {
                     Ok(c) => c,
                     Err(e) => {
                         let error_msg = format!("{}", e);
                         if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
                             println!("[Kafkit] Group '{}' expired during query", group_id);
-                            return Ok(result); // 返回已获取的数据
+                            return Ok(result);
                         }
                         println!("[Kafkit] Failed to fetch committed offsets for {}: {}", topic_name, e);
                         continue;
@@ -930,7 +977,6 @@ impl ConnectionManager {
                                 rdkafka::Offset::End => high,
                                 rdkafka::Offset::Beginning => 0,
                                 _ => {
-                                    // 对于 Invalid/Stored 等状态，尝试获取水印
                                     println!("[Kafkit] Unusual offset state for {}-{}: {:?}", topic_name, partition, offset);
                                     -1
                                 }
@@ -942,16 +988,13 @@ impl ConnectionManager {
                                 high
                             };
                             
-                            // 只添加有实际消费记录或存在 lag 的分区
-                            if current_offset >= 0 || lag > 0 {
-                                result.push(PartitionLag {
-                                    topic: topic_name.to_string(),
-                                    partition,
-                                    current_offset,
-                                    log_end_offset: high,
-                                    lag,
-                                });
-                            }
+                            result.push(PartitionLag {
+                                topic: topic_name.to_string(),
+                                partition,
+                                current_offset,
+                                log_end_offset: high,
+                                lag,
+                            });
                         }
                         Err(e) => {
                             println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic_name, partition, e);
@@ -963,49 +1006,13 @@ impl ConnectionManager {
         
         // 按 topic 和 partition 排序
         result.sort_by(|a, b| {
-            match a.topic.cmp(&b.topic) {
-                std::cmp::Ordering::Equal => a.partition.cmp(&b.partition),
-                other => other,
-            }
+            a.topic.cmp(&b.topic).then(a.partition.cmp(&b.partition))
         });
         
-        println!("[Kafkit] Found {} partitions with lag info for group '{}'", result.len(), group_id);
+        println!("[Kafkit] Found {} partition lag entries for group '{}'", result.len(), group_id);
         Ok(result)
     }
     
-    /// 带重试的获取 committed offsets
-    async fn fetch_committed_with_retry(
-        client: &rdkafka::client::Client,
-        tpl: &TopicPartitionList,
-        max_retries: u32,
-    ) -> Result<TopicPartitionList, rdkafka::error::KafkaError> {
-        let mut last_error = None;
-        
-        for attempt in 1..=max_retries {
-            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
-                Ok(result) => return Ok(result),
-                Err(e) => {
-                    let error_msg = format!("{}", e);
-                    // 对于 UnknownGroup 错误，不需要重试
-                    if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
-                        return Err(e);
-                    }
-                    
-                    println!("[Kafkit] Retry {}/{} for committed offsets: {}", attempt, max_retries, e);
-                    last_error = Some(e);
-                    
-                    if attempt < max_retries {
-                        tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
-                    }
-                }
-            }
-        }
-        
-        Err(last_error.unwrap_or_else(|| {
-            rdkafka::error::KafkaError::ClientCreation("Max retries exceeded".to_string())
-        }))
-    }
-        
     /// 重置 Consumer Group 的 Offset
     pub async fn reset_consumer_offset(
         &self,
@@ -1177,7 +1184,7 @@ use tokio::task::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc as StdArc;
 
-// 类型别名简化 StreamConsumer 类型
+// 使用 StreamConsumer 进行异步消息消费
 type KafkaStreamConsumer = StreamConsumer;
 
 pub struct ConsumerService {
@@ -1233,6 +1240,11 @@ impl ConsumerService {
         config.set("enable.auto.commit", "false");
         config.set("auto.offset.reset", auto_offset_reset);
         config.set("socket.timeout.ms", "10000");
+        config.set("session.timeout.ms", "10000");
+        config.set("enable.partition.eof", "false");
+        config.set("max.poll.interval.ms", "300000");
+        // 使用经典消费者组协议（避免与 broker 版本不兼容）
+        config.set("group.protocol", "classic");
 
         // 根据安全协议配置
         match connection.security.protocol {
@@ -1274,8 +1286,13 @@ impl ConsumerService {
             }
         }
 
+        // 调试配置
+        config.set("debug", "consumer");
+        
         let consumer: KafkaStreamConsumer = config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
+        
+        println!("[Kafkit] Consumer created successfully for session: {}", session_id);
 
         // 订阅 topic
         if let Some(partition_id) = partition {
@@ -1295,6 +1312,10 @@ impl ConsumerService {
             // 订阅整个 topic
             consumer.subscribe(&[topic])
                 .map_err(|e| AppError::KafkaError(format!("Failed to subscribe: {}", e)))?;
+            
+            // 等待消费者组加入和分区分配
+            println!("[Kafkit] Waiting for consumer group join...");
+            tokio::time::sleep(Duration::from_millis(1000)).await;
             
             // 如果需要从特定 offset 开始消费，手动 seek
             if let Some(offset_val) = specific_offset {

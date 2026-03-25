@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
+import { getConnection } from '../../services/tauriService';
 import type { ConnectionConfig, AuthConfig, SecurityConfig } from '../../types';
 import { useTranslation } from 'react-i18next';
 
@@ -49,12 +50,21 @@ export function ConnectionFormPage() {
     }
   }, [id]);
 
-  const loadConnection = async (_connId: string) => {
+  const loadConnection = async (connId: string) => {
     try {
-      // 这里应该从 API 获取，暂时使用简化方式
-      alert(t('connections.alerts.editOnlyInDesktop'));
-      navigate('/main/connections');
-      // setFormData...
+      // 直接从 API 获取连接详情
+      const connection = await getConnection(connId);
+      
+      // 加载连接数据到表单（bootstrapServers 从数组转换为逗号分隔的字符串）
+      setFormData({
+        name: connection.name,
+        bootstrapServers: Array.isArray(connection.bootstrapServers) 
+          ? connection.bootstrapServers.join(', ')
+          : connection.bootstrapServers,
+        auth: connection.auth || { type: 'none' },
+        security: connection.security || { protocol: 'PLAINTEXT' },
+        options: connection.options || {},
+      });
     } catch (error) {
       alert(t('connections.alerts.loadFailed'));
       navigate('/main/connections');

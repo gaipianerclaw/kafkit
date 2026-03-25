@@ -76,6 +76,7 @@ const detectContentType = (str: string): ContentType => {
 
 // CSV 表格渲染器
 const CsvRenderer = ({ data }: { data: string }) => {
+  const { t } = useTranslation();
   const lines = data.trim().split('\n');
   if (lines.length === 0) return null;
   
@@ -135,7 +136,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
       </table>
       {hasMore && (
         <div className="text-xs text-muted-foreground text-center py-2">
-          ... 还有 {rows.length - 20} 行数据
+          ... {t('consumer.rowsLeft', { count: rows.length - 20 })}
         </div>
       )}
     </div>
@@ -144,6 +145,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
 
 // JSON 语法高亮渲染器
 const JsonRenderer = ({ data }: { data: unknown }) => {
+  const { t } = useTranslation();
   const renderValue = (value: unknown, depth = 0): JSX.Element => {
     const indent = '  '.repeat(depth);
     
@@ -179,7 +181,7 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
               </div>
             ))}
             {hasMore && (
-              <div className="text-muted-foreground">... 还有 {value.length - 50} 项</div>
+              <div className="text-muted-foreground">... {t('consumer.itemsLeft', { count: value.length - 50 })}</div>
             )}
           </div>
           <span>{indent}]</span>
@@ -223,6 +225,7 @@ const MessageItem = memo(({ msg, index }: {
   msg: KafkaMessage;
   index: number;
 }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -316,7 +319,7 @@ const MessageItem = memo(({ msg, index }: {
             copyFullJson();
           }}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground justify-self-center"
-          title="复制完整 JSON"
+          title={t('consumer.copyFullJson')}
         >
           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
@@ -849,30 +852,7 @@ export function ConsumerPage() {
     if (!activeConnection || !topic) return;
 
     try {
-      // 如果是文件模式，先初始化文件
-      if (consumerConfig.mode === 'file') {
-        const initialized = await initFileWriter();
-        if (!initialized) {
-          console.log('[Kafkit] User cancelled file save dialog');
-          return;
-        }
-      }
-
-      const tauriService = await getService();
-      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
-      const offsetSpec = buildOffsetSpec();
-      
-      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
-      
-      const sid = await tauriService.startConsuming(
-        activeConnection,
-        decodedTopic,
-        partition,
-        offsetSpec
-      );
-      setSessionId(sid);
-      setIsConsuming(true);
-
+      // 先设置事件监听，避免错过早期消息
       const tauriEvent = await getTauriEvent();
       
       if (tauriEvent && tauriEvent.listen) {
@@ -891,8 +871,42 @@ export function ConsumerPage() {
         });
         unlistenRef.current = unlisten;
       }
+
+      // 如果是文件模式，先初始化文件
+      if (consumerConfig.mode === 'file') {
+        const initialized = await initFileWriter();
+        if (!initialized) {
+          console.log('[Kafkit] User cancelled file save dialog');
+          // 取消监听
+          if (unlistenRef.current) {
+            unlistenRef.current();
+            unlistenRef.current = null;
+          }
+          return;
+        }
+      }
+
+      const tauriService = await getService();
+      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
+      const offsetSpec = buildOffsetSpec();
+      
+      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
+      
+      const sid = await tauriService.startConsuming(
+        activeConnection,
+        decodedTopic,
+        partition,
+        offsetSpec
+      );
+      setSessionId(sid);
+      setIsConsuming(true);
     } catch (err) {
       alert(t('consumer.alerts.startFailed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+      // 出错时清理监听
+      if (unlistenRef.current) {
+        unlistenRef.current();
+        unlistenRef.current = null;
+      }
     }
   };
 
@@ -1094,17 +1108,17 @@ export function ConsumerPage() {
 
   const partitionOptions = detail 
     ? [
-        { value: 'all', label: t('consumer.columns.partition') + ': All' },
+        { value: 'all', label: t('consumer.columns.partition') + ': ' + t('common.all') },
         ...detail.partitions.map(p => ({ value: String(p.partition), label: `P${p.partition}` }))
       ]
-    : [{ value: 'all', label: t('consumer.columns.partition') + ': All' }];
+    : [{ value: 'all', label: t('consumer.columns.partition') + ': ' + t('common.all') }];
 
   const getOffsetLabel = () => {
     switch (consumerConfig.offsetType) {
-      case 'earliest': return 'Earliest';
-      case 'timestamp': return 'Time';
+      case 'earliest': return t('consumer.config.positions.earliestShort') || 'Earliest';
+      case 'timestamp': return t('consumer.timeSelector.shortLabel') || 'Time';
       case 'offset': return `Offset:${consumerConfig.offsetValue}`;
-      default: return 'Latest';
+      default: return t('consumer.config.positions.latestShort') || 'Latest';
     }
   };
 
@@ -1115,7 +1129,7 @@ export function ConsumerPage() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 h-14 border-b border-border flex items-center justify-between px-4 bg-background z-20">
+      <div className="flex-shrink-0 min-h-14 border-b border-border flex items-center justify-between px-4 py-2 bg-background z-20 flex-wrap gap-y-2">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -1171,7 +1185,7 @@ export function ConsumerPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* 分区选择 */}
           <Select
             value={selectedPartition}
@@ -1349,9 +1363,9 @@ export function ConsumerPage() {
             <span></span>
             <span>{t('consumer.columns.index')}</span>
             <span>{t('consumer.columns.partition')}</span>
-            <span>Offset</span>
+            <span>{t('consumer.columns.offset')}</span>
             <span>{t('consumer.columns.timestamp')}</span>
-            <span>Key</span>
+            <span>{t('consumer.columns.key')}</span>
             <span>{t('consumer.columns.value')}</span>
             <span className="text-center">{t('consumer.columns.actions')}</span>
           </div>
@@ -1402,7 +1416,7 @@ export function ConsumerPage() {
             <div className="text-center">
               <p className="text-lg font-medium text-foreground mb-2">{t('consumer.status.writing')}</p>
               <p className="text-sm">{t('consumer.status.written', { count: fileMessageCount })}</p>
-              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || 'Preparing...'}</p>
+              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || t('consumer.status.preparing')}</p>
             </div>
           ) : (
             <div className="text-center">
@@ -1432,7 +1446,7 @@ export function ConsumerPage() {
           {isConsuming && (
             <span className="flex items-center gap-1.5 text-green-600">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              t('consumer.status.consuming')
+              {t('consumer.status.consuming')}
             </span>
           )}
         </div>

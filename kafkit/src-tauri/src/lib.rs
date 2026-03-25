@@ -41,12 +41,13 @@ pub fn run() {
                 config_store,
             });
             
-            // 获取主窗口并打开开发者工具
-            #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
-            }
+            // 开发模式下可通过快捷键手动打开开发者工具 (Cmd+Option+I on macOS, Ctrl+Shift+I on Windows/Linux)
+            // 如需自动打开，取消下面注释：
+            // #[cfg(debug_assertions)]
+            // {
+            //     let window = app.get_webview_window("main").unwrap();
+            //     window.open_devtools();
+            // }
             
             Ok(())
         })

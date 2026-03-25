@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Users } from 'lucide-react';
+import { RefreshCw, Users, Settings2, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConnectionStore } from '../../stores';
-import type { ConsumerGroupInfo, PartitionLag } from '../../types';
+import type { ConsumerGroupInfo, PartitionLag, OffsetResetSpec } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 // 检测是否在 Tauri 环境中
@@ -20,6 +20,219 @@ const getService = async () => {
   }
 };
 
+// 偏移量重置对话框组件
+interface ResetOffsetDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  groupId: string;
+  lagData: PartitionLag[];
+  onReset: (topic: string, partition: number | undefined, resetTo: OffsetResetSpec) => Promise<void>;
+}
+
+function ResetOffsetDialog({ isOpen, onClose, groupId, lagData, onReset }: ResetOffsetDialogProps) {
+  const { t } = useTranslation();
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedPartition, setSelectedPartition] = useState<string>('all');
+  const [resetType, setResetType] = useState<'earliest' | 'latest' | 'timestamp' | 'offset'>('earliest');
+  const [timestamp, setTimestamp] = useState('');
+  const [offsetValue, setOffsetValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 获取该 Group 消费的所有 Topics
+  const topics = useMemo(() => {
+    const topicSet = new Set<string>();
+    lagData.forEach(item => topicSet.add(item.topic));
+    return Array.from(topicSet).sort();
+  }, [lagData]);
+
+  // 获取选中 Topic 的分区列表
+  const partitions = useMemo(() => {
+    if (!selectedTopic) return [];
+    return lagData
+      .filter(item => item.topic === selectedTopic)
+      .map(item => item.partition)
+      .sort((a, b) => a - b);
+  }, [lagData, selectedTopic]);
+
+  // 重置表单状态
+  const resetForm = () => {
+    setSelectedTopic(topics[0] || '');
+    setSelectedPartition('all');
+    setResetType('earliest');
+    setTimestamp('');
+    setOffsetValue('');
+  };
+
+  // 对话框打开时初始化
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!selectedTopic) return;
+
+    setIsLoading(true);
+    try {
+      let resetSpec: OffsetResetSpec;
+      switch (resetType) {
+        case 'earliest':
+          resetSpec = { type: 'earliest' };
+          break;
+        case 'latest':
+          resetSpec = { type: 'latest' };
+          break;
+        case 'timestamp':
+          resetSpec = { type: 'timestamp', timestamp: new Date(timestamp).getTime() };
+          break;
+        case 'offset':
+          resetSpec = { type: 'offset', offset: parseInt(offsetValue) };
+          break;
+        default:
+          resetSpec = { type: 'earliest' };
+      }
+
+      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
+      await onReset(selectedTopic, partition, resetSpec);
+      onClose();
+    } catch (err) {
+      console.error('Failed to reset offset:', err);
+      alert(t('consumerGroups.resetFailed') + ': ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-background border border-border rounded-lg shadow-lg w-[480px] max-w-[90vw] max-h-[90vh] overflow-auto">
+        <div className="p-4 border-b border-border">
+          <h3 className="text-lg font-semibold">{t('consumerGroups.resetOffset.title')}</h3>
+          <p className="text-sm text-muted-foreground">{groupId}</p>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Topic 选择 */}
+          <div>
+            <label className="block text-sm font-medium mb-2">{t('consumerGroups.resetOffset.topic')}</label>
+            <select
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="">{t('consumerGroups.resetOffset.selectTopic')}</option>
+              {topics.map(topic => (
+                <option key={topic} value={topic}>{topic}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Partition 选择 */}
+          <div>
+            <label className="block text-sm font-medium mb-2">{t('consumerGroups.resetOffset.partition')}</label>
+            <select
+              value={selectedPartition}
+              onChange={(e) => setSelectedPartition(e.target.value)}
+              className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+              disabled={!selectedTopic}
+            >
+              <option value="all">{t('consumerGroups.resetOffset.allPartitions')}</option>
+              {partitions.map(p => (
+                <option key={p} value={p}>{t('consumerGroups.resetOffset.partition')} {p}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 重置策略 */}
+          <div>
+            <label className="block text-sm font-medium mb-2">{t('consumerGroups.resetOffset.strategy')}</label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetType"
+                  value="earliest"
+                  checked={resetType === 'earliest'}
+                  onChange={(e) => setResetType(e.target.value as any)}
+                  className="rounded border-border"
+                />
+                <span className="text-sm">{t('consumerGroups.resetOffset.earliest')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetType"
+                  value="latest"
+                  checked={resetType === 'latest'}
+                  onChange={(e) => setResetType(e.target.value as any)}
+                  className="rounded border-border"
+                />
+                <span className="text-sm">{t('consumerGroups.resetOffset.latest')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetType"
+                  value="timestamp"
+                  checked={resetType === 'timestamp'}
+                  onChange={(e) => setResetType(e.target.value as any)}
+                  className="rounded border-border"
+                />
+                <span className="text-sm">{t('consumerGroups.resetOffset.timestamp')}</span>
+              </label>
+              {resetType === 'timestamp' && (
+                <input
+                  type="datetime-local"
+                  value={timestamp}
+                  onChange={(e) => setTimestamp(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm ml-6"
+                />
+              )}
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetType"
+                  value="offset"
+                  checked={resetType === 'offset'}
+                  onChange={(e) => setResetType(e.target.value as any)}
+                  className="rounded border-border"
+                />
+                <span className="text-sm">{t('consumerGroups.resetOffset.specificOffset')}</span>
+              </label>
+              {resetType === 'offset' && (
+                <input
+                  type="number"
+                  value={offsetValue}
+                  onChange={(e) => setOffsetValue(e.target.value)}
+                  placeholder={t('consumerGroups.resetOffset.offsetPlaceholder')}
+                  className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm ml-6"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-border flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+            {t('common.cancel')}
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            isLoading={isLoading}
+            disabled={!selectedTopic || (resetType === 'timestamp' && !timestamp) || (resetType === 'offset' && !offsetValue)}
+          >
+            <RotateCcw className="w-4 h-4 mr-1" />
+            {t('consumerGroups.resetOffset.confirm')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GroupListPage() {
   const navigate = useNavigate();
   const { activeConnection } = useConnectionStore();
@@ -31,6 +244,8 @@ export function GroupListPage() {
   const [loading, setLoading] = useState(false);
   const [lagLoading, setLagLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (activeConnection) {
@@ -77,6 +292,34 @@ export function GroupListPage() {
       setLagData([]);
     } finally {
       setLagLoading(false);
+    }
+  };
+
+  const handleResetOffset = async (
+    topic: string, 
+    partition: number | undefined, 
+    resetTo: OffsetResetSpec
+  ) => {
+    if (!activeConnection || !selectedGroup) return;
+
+    setIsResetting(true);
+    try {
+      const tauriService = await getService();
+      await tauriService.resetConsumerOffset(
+        activeConnection,
+        selectedGroup,
+        topic,
+        partition,
+        resetTo
+      );
+      // 刷新 Lag 数据
+      await fetchLag(selectedGroup);
+      alert(t('consumerGroups.resetOffset.success'));
+    } catch (err) {
+      console.error('Failed to reset offset:', err);
+      throw err;
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -139,10 +382,10 @@ export function GroupListPage() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${getStateColor(group?.state)}`} />
-                    <span className="font-medium truncate">{group?.groupId || 'Unknown'}</span>
+                    <span className="font-medium truncate">{group?.groupId || t('common.unknown')}</span>
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    Members: {group?.memberCount ?? 0} | Coordinator: {group?.coordinator ?? 0}
+                    {t('consumerGroups.members')}: {group?.memberCount ?? 0} | {t('consumerGroups.coordinator')}: {group?.coordinator ?? 0}
                   </div>
                 </button>
               ))}
@@ -161,6 +404,15 @@ export function GroupListPage() {
                     {t('consumerGroups.totalLag')}: {totalLag.toLocaleString()}
                   </p>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowResetDialog(true)}
+                  isLoading={isResetting}
+                >
+                  <Settings2 className="w-4 h-4 mr-1" />
+                  {t('consumerGroups.resetOffset.title')}
+                </Button>
               </div>
 
               {lagLoading ? (
@@ -208,6 +460,15 @@ export function GroupListPage() {
           )}
         </div>
       </div>
+
+      {/* Reset Offset Dialog */}
+      <ResetOffsetDialog
+        isOpen={showResetDialog}
+        onClose={() => setShowResetDialog(false)}
+        groupId={selectedGroup || ''}
+        lagData={lagData}
+        onReset={handleResetOffset}
+      />
     </div>
   );
 }
