@@ -79,21 +79,44 @@ impl ConnectionManager {
             SecurityProtocol::SaslSsl => {
                 config.set("security.protocol", "SASL_SSL");
                 
-                // SSL 配置
-                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
-                    if let Some(ca_path) = ca_cert {
-                        config.set("ssl.ca.location", ca_path);
+                // SSL 配置 - 从 SASL 认证配置中获取证书
+                match &connection.auth {
+                    AuthConfig::SaslPlain { ca_cert, client_cert, client_key, .. } |
+                    AuthConfig::SaslScram { ca_cert, client_cert, client_key, .. } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] Setting SSL CA cert: {}", ca_path);
+                            config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] Setting SSL client cert: {}", cert_path);
+                            config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] Setting SSL client key: {}", key_path);
+                            config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(cert_path) = client_cert {
-                        config.set("ssl.certificate.location", cert_path);
+                    AuthConfig::Ssl { ca_cert, client_cert, client_key } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] Setting SSL CA cert: {}", ca_path);
+                            config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] Setting SSL client cert: {}", cert_path);
+                            config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] Setting SSL client key: {}", key_path);
+                            config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(key_path) = client_key {
-                        config.set("ssl.key.location", key_path);
-                    }
-                    let verify_hostname = connection.security.ssl_verify_hostname.unwrap_or(true);
-                    config.set("ssl.endpoint.identification.algorithm", 
-                        if verify_hostname { "https" } else { "none" });
+                    _ => {}
                 }
+                
+                // 主机名验证
+                let verify_hostname = connection.security.ssl_verify_hostname.unwrap_or(true);
+                config.set("ssl.endpoint.identification.algorithm", 
+                    if verify_hostname { "https" } else { "none" });
                 
                 // SASL 配置
                 Self::configure_sasl(&mut config, &connection.auth)?;
@@ -106,12 +129,12 @@ impl ConnectionManager {
     /// 配置 SASL 认证
     fn configure_sasl(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",
@@ -281,20 +304,46 @@ impl ConnectionManager {
             SecurityProtocol::SaslSsl => {
                 test_config.set("security.protocol", "SASL_SSL");
                 println!("[Kafkit] Using SASL_SSL authentication");
-                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &config.auth {
-                    if let Some(ca_path) = ca_cert {
-                        println!("[Kafkit] SSL CA cert: {}", ca_path);
-                        test_config.set("ssl.ca.location", ca_path);
+                
+                // SSL 配置 - 从 SASL 认证配置中获取证书
+                match &config.auth {
+                    AuthConfig::SaslPlain { ca_cert, client_cert, client_key, .. } |
+                    AuthConfig::SaslScram { ca_cert, client_cert, client_key, .. } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] SSL CA cert: {}", ca_path);
+                            test_config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] SSL client cert: {}", cert_path);
+                            test_config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] SSL client key: {}", key_path);
+                            test_config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(cert_path) = client_cert {
-                        println!("[Kafkit] SSL client cert: {}", cert_path);
-                        test_config.set("ssl.certificate.location", cert_path);
+                    AuthConfig::Ssl { ca_cert, client_cert, client_key } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] SSL CA cert: {}", ca_path);
+                            test_config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] SSL client cert: {}", cert_path);
+                            test_config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] SSL client key: {}", key_path);
+                            test_config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(key_path) = client_key {
-                        println!("[Kafkit] SSL client key: {}", key_path);
-                        test_config.set("ssl.key.location", key_path);
-                    }
+                    _ => {}
                 }
+                
+                // 主机名验证
+                let verify_hostname = config.security.ssl_verify_hostname.unwrap_or(true);
+                test_config.set("ssl.endpoint.identification.algorithm", 
+                    if verify_hostname { "https" } else { "none" });
+                
                 Self::configure_sasl_for_test(&mut test_config, &config.auth)?;
             }
         }
@@ -326,13 +375,13 @@ impl ConnectionManager {
     
     fn configure_sasl_for_test(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
                 println!("[Kafkit] SASL/PLAIN: username={}", username);
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",
@@ -1569,12 +1618,12 @@ impl ConsumerService {
 
     fn configure_sasl_consumer(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",

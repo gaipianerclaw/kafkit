@@ -8,14 +8,23 @@
 - **修复编辑连接问题**: 使用 `getConnection` API 直接获取连接详情，避免依赖 store 缓存
 - **修复删除确认问题**: 使用自定义确认对话框替代原生 `confirm()`，解决 Tauri 环境下非阻塞执行导致提前删除的问题
 - **修复导入/导出按钮国际化**: 添加缺失的 `connections.import`、`connections.export` 等翻译键
+- **修复 ConnectionFormPage 重复渲染**: 添加 `hasLoaded` 状态防止 useEffect 重复调用
+
+#### SSL/SASL_SSL 连接修复
+- **修复 SASL_SSL 证书配置**: 为 `SaslPlain` 和 `SaslScram` 认证类型添加可选的 SSL 证书字段
+- **添加主机名验证选项**: 支持禁用主机名验证（用于自签名证书测试环境）
+- **后端 SSL 配置修复**: 统一处理 SSL 和 SASL_SSL 协议的证书配置逻辑
 
 #### Kafka Consumer 修复
 - **修复消息消费失败问题**: 添加 rdkafka 压缩支持（gzip, lz4, zstd），解决 "NotImplemented" 错误
 - **Cargo.toml**: 添加 `zstd` 和 `external-lz4` 特性
 
+#### Topic 管理修复
+- **添加副本因子提示**: 创建 Topic 时显示提示"单节点 Kafka 只能设置为 1"
+
 #### i18n 修复
 - **Consumer 页面**: 修复 JSX 表达式错误（`t('...')` → `{t('...')}`）
-- **添加缺失翻译**: 消费组、消费者配置、时间选择器等组件的翻译键
+- **添加缺失翻译**: 消费组、消费者配置、时间选择器、SSL 证书等组件的翻译键
 
 ### 🔧 优化改进
 
@@ -24,6 +33,13 @@
 
 #### UI 优化
 - **Consumer 页面布局**: 修复窄屏幕下头部控件被截断的问题，使用 `flex-wrap` 实现自适应布局
+
+### 🧪 测试环境
+
+#### Kafka 多协议测试环境
+- **新增 docker/kafka-ssl**: 支持 PLAINTEXT、SSL、SASL_PLAINTEXT、SASL_SSL 四种连接方式
+- **自动生成 SSL 证书**: 包含 CA 证书、服务器密钥库、信任库
+- **预设测试用户**: admin/alice/bob，支持 PLAIN 和 SCRAM 认证
 
 ---
 

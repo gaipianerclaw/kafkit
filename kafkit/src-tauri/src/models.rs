@@ -32,12 +32,25 @@ pub enum AuthConfig {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "saslPlain")]
-    SaslPlain { username: String, password: String },
+    #[serde(rename_all = "camelCase")]
+    SaslPlain { 
+        username: String, 
+        password: String,
+        // 可选的 SSL 证书（用于 SASL_SSL）
+        ca_cert: Option<String>,
+        client_cert: Option<String>,
+        client_key: Option<String>,
+    },
     #[serde(rename = "saslScram")]
+    #[serde(rename_all = "camelCase")]
     SaslScram {
         mechanism: ScramMechanism,
         username: String,
         password: String,
+        // 可选的 SSL 证书（用于 SASL_SSL）
+        ca_cert: Option<String>,
+        client_cert: Option<String>,
+        client_key: Option<String>,
     },
     #[serde(rename = "saslGssapi")]
     #[serde(rename_all = "camelCase")]

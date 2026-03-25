@@ -76,7 +76,9 @@
       "clientKey": "客户端密钥路径 (可选)",
       "keytabPath": "Keytab 路径 (可选)",
       "scramMechanism": "SCRAM 机制",
-      "fillTestConfig": "填入测试配置"
+      "fillTestConfig": "填入测试配置",
+      "sslCertificates": "SSL 证书配置",
+      "disableHostnameVerification": "禁用主机名验证（用于自签名证书）"
     },
     "authTypes": {
       "none": "无认证 (PLAINTEXT)",

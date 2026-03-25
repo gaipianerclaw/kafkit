@@ -1,0 +1,60 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper-ssl
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_jaas.conf"
+    volumes:
+      - ./certs:/etc/kafka/secrets
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka-ssl-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-ssl
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"   # PLAINTEXT
+      - "9093:9093"   # SASL_PLAINTEXT
+      - "9094:9094"   # SSL
+      - "9095:9095"   # SASL_SSL
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # 监听器配置
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,SASL_PLAINTEXT://0.0.0.0:9093,SSL://0.0.0.0:9094,SASL_SSL://0.0.0.0:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SASL_PLAINTEXT://localhost:9093,SSL://localhost:9094,SASL_SSL://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL
+      
+      # SASL 配置
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      
+      # SSL 配置
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: server-password
+      KAFKA_SSL_KEY_CREDENTIALS: server-password
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: server-password
+      KAFKA_SSL_CLIENT_AUTH: none
+      
+      # 其他配置
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      
+      # KAFKA_OPTS 必须包含 JAAS 配置路径
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+      
+    volumes:
+      - ./certs:/etc/kafka/secrets
+    networks:
+      - kafka-ssl-net
+
+networks:
+  kafka-ssl-net:
+    driver: bridge

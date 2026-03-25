@@ -76,7 +76,9 @@
       "clientKey": "Client Key Path (optional)",
       "keytabPath": "Keytab Path (optional)",
       "scramMechanism": "SCRAM Mechanism",
-      "fillTestConfig": "Fill Test Config"
+      "fillTestConfig": "Fill Test Config",
+      "sslCertificates": "SSL Certificates",
+      "disableHostnameVerification": "Disable hostname verification (for self-signed certs)"
     },
     "authTypes": {
       "none": "No Auth (PLAINTEXT)",
