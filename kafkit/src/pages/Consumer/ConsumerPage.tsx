@@ -1369,29 +1369,32 @@ export function ConsumerPage() {
             </div>
           )}
 
-          {/* 表头 */}
-          <div className="flex-shrink-0 grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
-            <span></span>
-            <span>{t('consumer.columns.index')}</span>
-            <span>{t('consumer.columns.partition')}</span>
-            <span>{t('consumer.columns.offset')}</span>
-            <span>{t('consumer.columns.timestamp')}</span>
-            <span>{t('consumer.columns.key')}</span>
-            <span>{t('consumer.columns.value')}</span>
-            <span className="text-center">{t('consumer.columns.actions')}</span>
-          </div>
-
           {/* Memory Warning */}
           {messages.length > 5000 && (
-            <MemoryWarning
-              messageCount={messages.length}
-              onExport={exportMessages}
-              onDismiss={() => {}}
-            />
+            <div className="flex-shrink-0">
+              <MemoryWarning
+                messageCount={messages.length}
+                onExport={exportMessages}
+                onDismiss={() => {}}
+              />
+            </div>
           )}
 
           {/* Messages - Virtual Scroll */}
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* 表头 */}
+            <div className="flex-shrink-0 grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
+              <span></span>
+              <span>{t('consumer.columns.index')}</span>
+              <span>{t('consumer.columns.partition')}</span>
+              <span>{t('consumer.columns.offset')}</span>
+              <span>{t('consumer.columns.timestamp')}</span>
+              <span>{t('consumer.columns.key')}</span>
+              <span>{t('consumer.columns.value')}</span>
+              <span className="text-center">{t('consumer.columns.actions')}</span>
+            </div>
+            
+            {/* 消息列表 */}
             <VirtualMessageList
               messages={messages}
               filteredMessages={filteredMessages}
