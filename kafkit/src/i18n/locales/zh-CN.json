@@ -27,6 +27,9 @@
     "success": "成功",
     "failed": "失败",
     "error": "错误",
+    "errorDetails": "错误详情",
+    "errorCode": "错误码",
+    "errorSolutions": "解决建议",
     "warning": "警告",
     "info": "信息",
     "yes": "是",
@@ -281,7 +284,11 @@
     },
     "alerts": {
       "startFailed": "启动消费失败",
-      "exportFailed": "导出失败"
+      "exportFailed": "导出失败",
+      "memoryWarning": "消息数量过多",
+      "memoryWarningDesc": "当前已加载 {count} 条消息，继续加载可能导致内存不足。建议导出到文件查看。",
+      "largeMessageWarning": "消息体积过大",
+      "largeMessageWarningDesc": "单条消息超过 {size}KB，已截断显示。完整内容请导出查看。"
     },
     "searchPlaceholder": "搜索消息内容...",
     "searchFields": {
@@ -292,6 +299,10 @@
     "useRegex": "正则",
     "caseSensitive": "区分大小写",
     "noSearchResults": "没有匹配的消息",
+    "memoryLimitReached": "消息数量已达上限 ({count} 条)，早期消息将被自动清理",
+    "virtualScroll": {
+      "showing": "显示 {visible} / {total} 条消息"
+    },
     "rowsLeft": "还有 {count} 行数据",
     "itemsLeft": "还有 {count} 项"
   },
@@ -371,6 +382,20 @@
   "errors": {
     "generic": "应用发生错误",
     "boundaryTitle": "出错了",
-    "boundaryMessage": "应用发生错误，请刷新页面重试"
+    "boundaryMessage": "应用发生错误，请刷新页面重试",
+    "kafka": {
+      "NetworkException": "网络连接失败，请检查 Kafka 地址和端口是否正确",
+      "UnknownTopicOrPartition": "Topic 不存在或暂无数据，请检查 Topic 名称",
+      "NotLeaderForPartition": "正在选举 Leader，请稍后重试",
+      "AuthorizationFailed": "认证失败，请检查用户名和密码",
+      "AuthenticationFailed": "认证失败，请检查认证信息配置",
+      "SSLHandshakeFailed": "SSL 握手失败，请检查证书配置",
+      "ConnectionRefused": "连接被拒绝，请检查 Kafka 服务是否启动",
+      "TimeoutException": "请求超时，请检查网络连接或增加超时时间",
+      "UnknownMemberId": "Consumer Group 成员未知，可能是会话过期",
+      "RebalanceInProgress": "Consumer Group 正在重平衡，请稍后重试",
+      "InvalidOffset": "无效的 Offset，可能是消息已过期",
+      "OffsetOutOfRange": "Offset 超出范围，建议重置为 Latest 或 Earliest"
+    }
   }
 }

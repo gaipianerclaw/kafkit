@@ -281,7 +281,11 @@
     },
     "alerts": {
       "startFailed": "Failed to start consuming",
-      "exportFailed": "Export failed"
+      "exportFailed": "Export failed",
+      "memoryWarning": "Too many messages",
+      "memoryWarningDesc": "Currently loaded {count} messages. Continuing may cause out of memory. Consider exporting to file.",
+      "largeMessageWarning": "Message too large",
+      "largeMessageWarningDesc": "Single message exceeds {size}KB, truncated for display. Export to view full content."
     },
     "searchPlaceholder": "Search in messages...",
     "searchFields": {
@@ -292,6 +296,10 @@
     "useRegex": "Regex",
     "caseSensitive": "Match case",
     "noSearchResults": "No messages match your search",
+    "memoryLimitReached": "Message limit reached ({count}), older messages will be cleaned up automatically",
+    "virtualScroll": {
+      "showing": "Showing {visible} / {total} messages"
+    },
     "rowsLeft": "{count} more rows",
     "itemsLeft": "{count} more items"
   },
@@ -371,6 +379,20 @@
   "errors": {
     "generic": "An error occurred",
     "boundaryTitle": "Oops!",
-    "boundaryMessage": "Something went wrong. Please refresh the page to try again."
+    "boundaryMessage": "Something went wrong. Please refresh the page to try again.",
+    "kafka": {
+      "NetworkException": "Network connection failed. Please check Kafka address and port.",
+      "UnknownTopicOrPartition": "Topic does not exist or has no data. Please check topic name.",
+      "NotLeaderForPartition": "Leader election in progress. Please retry later.",
+      "AuthorizationFailed": "Authorization failed. Please check username and password.",
+      "AuthenticationFailed": "Authentication failed. Please check authentication configuration.",
+      "SSLHandshakeFailed": "SSL handshake failed. Please check certificate configuration.",
+      "ConnectionRefused": "Connection refused. Please check if Kafka service is running.",
+      "TimeoutException": "Request timeout. Please check network connection or increase timeout.",
+      "UnknownMemberId": "Consumer Group member unknown, session may have expired.",
+      "RebalanceInProgress": "Consumer Group is rebalancing. Please retry later.",
+      "InvalidOffset": "Invalid offset. Messages may have expired.",
+      "OffsetOutOfRange": "Offset out of range. Consider resetting to Latest or Earliest."
+    }
   }
 }
