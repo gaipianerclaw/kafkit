@@ -2,17 +2,46 @@
 
 跨平台 Kafka 桌面客户端，支持 macOS、Linux 和 Windows。
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![Version](https://img.shields.io/badge/version-1.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能特性
 
-- 🔗 **连接管理**: 支持 PLAINTEXT、SSL、SASL_PLAINTEXT、SASL_SSL 协议
-- 📋 **Topic 管理**: 查看 Topic 列表、详情、分区、副本、ISR、Offset
-- 🌐 **国际化**: 支持简体中文和英文
-- 🎨 **深色模式**: 支持浅色/深色/跟随系统主题
-- 🔒 **安全连接**: 支持 SSL 证书和 SASL 认证
-- 📊 **分区详情**: 查看 Leader、Replicas、ISR、消息偏移量
+### 连接管理
+- 🔗 支持 PLAINTEXT、SSL、SASL_PLAINTEXT、SASL_SSL 协议
+- 🔒 SSL 证书管理（CA 证书、客户端证书、密钥）
+- 🔑 SASL 认证（PLAIN、SCRAM-SHA-256/512、GSSAPI）
+- 🧪 连接测试功能
+
+### Topic 管理
+- 📋 查看 Topic 列表、详情、分区信息
+- ➕ 创建 Topic（指定分区数、副本因子）
+- 🗑️ 删除 Topic（带确认对话框）
+- ⚙️ 查看和编辑 Topic 配置参数
+- 📊 分区详情（Leader、Replicas、ISR、Offset 范围、消息数量）
+
+### 消息生产
+- ✉️ 单条消息发送（支持指定 partition 和 key）
+- 📦 批量消息发送
+- ⏱️ 定时发送（可配置批次大小、间隔、重复次数）
+- 📝 支持文本、JSON、CSV 格式
+
+### 消息消费
+- 👁️ 实时消息预览（表格式展示）
+- 🔍 消息搜索功能
+- 📁 导出到文件（JSON/JSON Lines/CSV）
+- ⏮️ 多种起始位置（Latest/Earliest/Timestamp/Offset）
+- 📖 消息详情查看（完整元信息）
+
+### 消费者组管理
+- 👥 查看 Consumer Group 列表和状态
+- 📈 消费延迟(Lag)监控
+- 🔄 偏移量重置（支持 Earliest/Latest/指定 Offset）
+
+### 其他特性
+- 🌐 国际化：支持简体中文和英文
+- 🎨 深色模式：浅色/深色/跟随系统主题
+- 💻 跨平台：macOS、Linux、Windows
 
 ## 系统要求
 
@@ -24,39 +53,29 @@
 
 ## 下载安装
 
+从 [GitHub Releases](https://github.com/gaipianerclaw/kafkit/releases) 下载最新版本。
+
 ### macOS
-- [下载 Apple Silicon 版本](https://github.com/gaipianerclaw/kafkit/releases)
-- [下载 Intel 版本](https://github.com/gaipianerclaw/kafkit/releases)
+- `Kafkit_1.0.2_aarch64.dmg` (Apple Silicon)
+- `Kafkit_1.0.2_x64.dmg` (Intel)
 
 ### Linux
-- [下载 .deb (Ubuntu/Debian)](https://github.com/gaipianerclaw/kafkit/releases)
-- [下载 .rpm (Fedora/RHEL)](https://github.com/gaipianerclaw/kafkit/releases)
+- `kafkit_1.0.2_amd64.deb` (Ubuntu/Debian)
+- `kafkit-1.0.2-1.x86_64.rpm` (Fedora/RHEL)
 
 ### Windows
-- [下载 Installer](https://github.com/gaipianerclaw/kafkit/releases)
-- [下载 MSI](https://github.com/gaipianerclaw/kafkit/releases)
+- `Kafkit_1.0.2_x64-setup.exe`
+- `Kafkit_1.0.2_x64.msi`
 
 ## 快速开始
 
-1. **创建连接**
-   - 点击左上角连接选择器
-   - 选择"新建连接"
-   - 填写连接信息（名称、Bootstrap Servers、协议、认证）
-   - 点击"测试连接"验证
+1. **创建连接**: 点击左上角连接选择器 → 新建连接 → 填写信息 → 测试连接
+2. **查看 Topics**: 选择连接 → 点击左侧"Topic 管理"
+3. **发送消息**: 在 Topic 详情页点击"发送消息"
+4. **消费消息**: 在 Topic 详情页点击"消费消息"
+5. **查看消费组**: 点击左侧"消费组"
 
-2. **查看 Topics**
-   - 选择一个连接
-   - 点击左侧"Topics"
-   - 查看 Topic 列表
-
-3. **Topic 详情**
-   - 点击 Topic 名称或"查看详情"
-   - 查看分区信息、Leader、Replicas、ISR、Offset
-
-4. **新建 Topic**
-   - 在 Topics 页面点击"新建 Topic"
-   - 填写名称、分区数、副本因子
-   - 点击创建
+详细使用说明请参考 [USER_GUIDE.md](./USER_GUIDE.md)
 
 ## 技术栈
 
@@ -73,34 +92,15 @@
 - Node.js 18+
 - npm 或 yarn
 
-### macOS
+### 快速构建
+
 ```bash
 cd kafkit
 npm install
 npm run tauri:build
 ```
 
-### Linux (Ubuntu)
-```bash
-# 安装依赖
-sudo apt-get update
-sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev cmake
-
-# 构建
-cd kafkit
-npm install
-npm run tauri:build
-```
-
-### Windows
-```powershell
-# 安装 Visual Studio Build Tools (选择"使用 C++ 的桌面开发")
-
-# 构建
-cd kafkit
-npm install
-npm run tauri:build
-```
+各平台详细构建说明请参考 [BUILD_DESKTOP.sh](./BUILD_DESKTOP.sh)
 
 ## 项目结构
 
@@ -120,18 +120,32 @@ kafka-connector/
 │   │       ├── services.rs # Kafka 服务
 │   │       └── models.rs   # 数据模型
 │   └── package.json
+├── docker/                 # 测试环境
+│   ├── kafka-ssl/          # SSL/SASL 测试环境
+│   └── kafka-sasl/         # SASL 测试环境
+├── CHANGELOG.md
+├── USER_GUIDE.md
 └── README.md
 ```
 
-## 关键更新
+## 测试环境
 
-### v1.0.1
-- ✅ Kafka 客户端库从 `kafka` 切换到 `rdkafka`
-- ✅ 支持 SSL/SASL 安全认证
-- ✅ 添加国际化支持（中/英）
-- ✅ 添加深色模式
-- ✅ 优化 Topic 列表加载体验
-- ✅ 支持创建 Topic
+项目提供了 Docker 测试环境，支持多种 Kafka 连接协议：
+
+```bash
+cd docker/kafka-ssl
+docker-compose up -d
+```
+
+支持协议：
+- PLAINTEXT: localhost:9092
+- SASL_PLAINTEXT: localhost:9093 (admin/admin-secret)
+- SSL: localhost:9094
+- SASL_SSL: localhost:9095 (admin/admin-secret)
+
+## 更新日志
+
+详见 [CHANGELOG.md](./CHANGELOG.md)
 
 ## 许可证
 
@@ -144,5 +158,6 @@ MIT License
 ## 相关链接
 
 - [GitHub 仓库](https://github.com/gaipianerclaw/kafkit)
+- [用户手册](./USER_GUIDE.md)
 - [Tauri 文档](https://tauri.app/)
 - [rdkafka 文档](https://docs.rs/rdkafka/)

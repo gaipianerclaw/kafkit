@@ -1,0 +1,47 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper-auth
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka-auth-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-auth
+    depends_on:
+      - zookeeper
+    ports:
+      # 只开放 SASL_PLAINTEXT 端口，关闭 9092 PLAINTEXT
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # 只配置 SASL_PLAINTEXT 监听器，不配置 PLAINTEXT
+      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASL_PLAINTEXT:SASL_PLAINTEXT
+      
+      # SASL 配置
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      
+      # JAAS 配置
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+      
+      # 其他配置
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      
+    volumes:
+      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    networks:
+      - kafka-auth-net
+
+networks:
+  kafka-auth-net:
+    driver: bridge
