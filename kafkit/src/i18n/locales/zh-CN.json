@@ -30,6 +30,8 @@
     "errorDetails": "错误详情",
     "errorCode": "错误码",
     "errorSolutions": "解决建议",
+    "retry": "重试",
+    "dismiss": "忽略",
     "warning": "警告",
     "info": "信息",
     "yes": "是",
