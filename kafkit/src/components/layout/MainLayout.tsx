@@ -8,8 +8,11 @@ import {
   Server
 } from 'lucide-react';
 import { useConnectionStore } from '../../stores';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
+import { QuickSearch } from '../QuickSearch';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export function MainLayout() {
   const navigate = useNavigate();
@@ -20,6 +23,21 @@ export function MainLayout() {
   useEffect(() => {
     fetchConnections();
   }, []);
+
+  // 全局快捷键
+  const handleRefresh = useCallback(() => {
+    // 触发刷新事件，由各个页面监听
+    window.dispatchEvent(new CustomEvent('kafkit:refresh'));
+  }, []);
+
+  const handleQuickSearch = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('kafkit:quickSearch'));
+  }, []);
+
+  useKeyboardShortcuts([
+    { key: 'r', ctrl: true, handler: handleRefresh, description: 'Refresh' },
+    { key: 'k', ctrl: true, handler: handleQuickSearch, description: 'Quick search' },
+  ]);
 
   const activeConn = connections.find(c => c.id === activeConnection);
 
@@ -146,6 +164,12 @@ export function MainLayout() {
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Outlet />
       </main>
+      
+      {/* 快捷键帮助 */}
+      <KeyboardShortcutsHelp />
+      
+      {/* 快速搜索 */}
+      <QuickSearch />
     </div>
   );
 }

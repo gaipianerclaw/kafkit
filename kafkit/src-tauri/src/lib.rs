@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tauri::Manager;
 
 mod commands;
+mod connection_pool;
 mod models;
 mod services;
 mod store;

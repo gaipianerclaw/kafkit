@@ -212,6 +212,19 @@ export function TopicListPage() {
     }
   }, [activeConnection]);
 
+  // 监听全局刷新事件
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('[TopicListPage] Refresh triggered by keyboard shortcut');
+      if (activeConnection) {
+        fetchTopics();
+      }
+    };
+    
+    window.addEventListener('kafkit:refresh', handleRefresh);
+    return () => window.removeEventListener('kafkit:refresh', handleRefresh);
+  }, [activeConnection]);
+
   useEffect(() => {
     if (searchQuery) {
       setFilteredTopics(topics.filter(t => 

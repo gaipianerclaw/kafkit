@@ -34,7 +34,7 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
     if (value === null) return <span className="text-gray-500">null</span>;
     if (typeof value === 'boolean') return <span className="text-orange-600">{String(value)}</span>;
     if (typeof value === 'number') return <span className="text-blue-600">{value}</span>;
-    if (typeof value === 'string') return <span className="text-green-600">"{value}"</span>;
+    if (typeof value === 'string') return <span className="text-green-600">&quot;{value}&quot;</span>;
     
     if (Array.isArray(value)) {
       if (value.length === 0) return <span>[]</span>;
@@ -60,7 +60,7 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
           <span>{'{'}</span>
           {entries.map(([key, val], idx) => (
             <div key={key} style={{ marginLeft: 12 }}>
-              <span className="text-purple-600">"{key}"</span>
+              <span className="text-purple-600">&quot;{key}&quot;</span>
               <span>: </span>
               {renderValue(val, level + 1)}
               {idx < entries.length - 1 && <span>,</span>}
@@ -128,7 +128,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIdx) => (
+          {rows.slice(0, 20).map((row, rowIdx) => (
             <tr key={rowIdx} className="border-b border-border/50">
               {row.map((cell, cellIdx) => (
                 <td key={cellIdx} className="py-1 px-2 font-mono">
@@ -139,9 +139,9 @@ const CsvRenderer = ({ data }: { data: string }) => {
           ))}
         </tbody>
       </table>
-      {rows.length > 10 && (
+      {rows.length > 20 && (
         <div className="text-xs text-muted-foreground text-center py-2">
-          {t('consumer.rowsLeft', { count: rows.length - 10 })}
+          {t('consumer.rowsLeft', { count: rows.length - 20 })}
         </div>
       )}
     </div>
@@ -155,7 +155,6 @@ interface MessageRowProps {
 }
 
 const MessageRow = memo(({ msg, index }: MessageRowProps) => {
-  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -204,8 +203,7 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
-    const ms = String(date.getMilliseconds()).padStart(3, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
   return (
@@ -247,7 +245,7 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
             copyFullJson();
           }}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground justify-self-center"
-          title={t('consumer.copyFullJson')}
+          title="Copy JSON"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
@@ -267,7 +265,7 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
               <span><span className="text-muted-foreground">Type:</span> <span className="font-mono uppercase">{contentType}</span></span>
             </div>
             {/* Value 内容 */}
-            <div className="p-3">
+            <div className="p-3 max-h-96 overflow-auto">
               {contentType === 'json' && <JsonRenderer data={displayValue} />}
               {contentType === 'csv' && <CsvRenderer data={msg.value} />}
               {contentType === 'text' && (
@@ -329,13 +327,11 @@ export const VirtualMessageList = memo(({
   }
 
   return (
-    <div className="flex-1 min-h-0 relative flex flex-col">
-      {/* 消息列表 - 使用 overflow-auto 确保滚动条显示 */}
+    <div className="flex-1 min-h-0 relative">
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-auto min-h-0 scrollbar-thin"
+        className="h-full overflow-y-auto scrollbar-thin"
         onScroll={handleScroll}
-        style={{ overflowY: 'auto', overflowX: 'hidden' }}
       >
         {filteredMessages.map((msg, idx) => (
           <MessageRow

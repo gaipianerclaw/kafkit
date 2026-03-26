@@ -399,5 +399,18 @@
       "InvalidOffset": "无效的 Offset，可能是消息已过期",
       "OffsetOutOfRange": "Offset 超出范围，建议重置为 Latest 或 Earliest"
     }
+  },
+  "quickSearch": {
+    "placeholder": "搜索 Topic、导航或执行命令...",
+    "noResults": "未找到结果",
+    "navigate": "导航",
+    "select": "选择",
+    "results": "个结果",
+    "goToTopics": "跳转到 Topic 管理",
+    "goToGroups": "跳转到消费组",
+    "goToSettings": "跳转到设置",
+    "goToConnections": "管理连接",
+    "topicPartitions": "{count} 个分区",
+    "switchConnection": "切换到该连接"
   }
 }

@@ -399,5 +399,18 @@
       "InvalidOffset": "Invalid offset. Messages may have expired.",
       "OffsetOutOfRange": "Offset out of range. Consider resetting to Latest or Earliest."
     }
+  },
+  "quickSearch": {
+    "placeholder": "Search topics, navigate, or run commands...",
+    "noResults": "No results found",
+    "navigate": "Navigate",
+    "select": "Select",
+    "results": "results",
+    "goToTopics": "Go to Topic Management",
+    "goToGroups": "Go to Consumer Groups",
+    "goToSettings": "Go to Settings",
+    "goToConnections": "Manage Connections",
+    "topicPartitions": "{count} partitions",
+    "switchConnection": "Switch to this connection"
   }
 }
