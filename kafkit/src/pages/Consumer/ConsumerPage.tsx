@@ -6,6 +6,9 @@ import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
 import type { KafkaMessage, TopicDetail, OffsetSpec } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { VirtualMessageList } from '../../components/VirtualMessageList';
+import { MemoryWarning } from '../../components/MemoryWarning';
+import { MEMORY_LIMIT_THRESHOLD } from '../../utils/errorHandler';
 
 // Tauri dialog API
 const getTauriDialog = async () => {
@@ -720,6 +723,14 @@ export function ConsumerPage() {
 
   const handleNewMessage = useCallback((newMsg: KafkaMessage) => {
     setMessages(prev => {
+      // 内存限制检查 - 超过阈值时清理早期消息
+      if (prev.length >= MEMORY_LIMIT_THRESHOLD) {
+        console.warn(`[Kafkit] Message count reached limit (${MEMORY_LIMIT_THRESHOLD}), cleaning up old messages`);
+        // 保留后 5000 条，给用户缓冲空间
+        const cleanedMessages = prev.slice(prev.length - 5000);
+        return [...cleanedMessages, newMsg];
+      }
+      
       const limit = previewLimit === 'unlimited' ? Infinity : parseInt(previewLimit);
       const newMessages = [...prev, newMsg];
       if (newMessages.length > limit) {
@@ -1370,40 +1381,28 @@ export function ConsumerPage() {
             <span className="text-center">{t('consumer.columns.actions')}</span>
           </div>
 
-          {/* Messages */}
-          <div 
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto bg-background min-h-0"
-            onScroll={() => {
-              if (scrollContainerRef.current) {
-                const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-                const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+          {/* Memory Warning */}
+          {messages.length > 5000 && (
+            <MemoryWarning
+              messageCount={messages.length}
+              onExport={exportMessages}
+              onDismiss={() => {}}
+            />
+          )}
+
+          {/* Messages - Virtual Scroll */}
+          <div className="flex-1 min-h-0">
+            <VirtualMessageList
+              messages={messages}
+              filteredMessages={filteredMessages}
+              isConsuming={isConsuming}
+              autoScroll={autoScroll}
+              onScrollStateChange={(isNearBottom) => {
                 if (!isNearBottom && autoScroll) {
                   setAutoScroll(false);
                 }
-              }
-            }}
-          >
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                {isConsuming ? t('consumer.waiting') : t('consumer.clickToStart')}
-              </div>
-            ) : filteredMessages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                {t('consumer.noSearchResults') || 'No messages match your search'}
-              </div>
-            ) : (
-              <div>
-                {filteredMessages.map((msg, idx) => (
-                  <MessageItem
-                    key={`${msg.partition}-${msg.offset}-${idx}`}
-                    msg={msg}
-                    index={messages.indexOf(msg)}
-                  />
-                ))}
-                <div ref={messagesEndRef} className="h-4" />
-              </div>
-            )}
+              }}
+            />
           </div>
         </>
       )}

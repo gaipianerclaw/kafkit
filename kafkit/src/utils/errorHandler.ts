@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+// Kafka 错误码处理工具
 
 // Kafka 错误码映射
 export interface ErrorInfo {
