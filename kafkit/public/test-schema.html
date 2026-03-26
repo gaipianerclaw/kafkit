@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Schema Format Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+    .avro { background: #fff3e0; border: 1px solid #ff9800; }
+    .protobuf { background: #e3f2fd; border: 1px solid #2196f3; }
+    pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    .result { margin: 20px 0; padding: 15px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Avro/Protobuf 格式测试</h1>
+  <p>点击按钮复制测试数据到剪贴板，然后在 Kafkit Producer 中粘贴发送</p>
+  
+  <h2>1. Avro JSON 格式</h2>
+  <button class="avro" onclick="copyAvro()">复制 Avro 测试数据</button>
+  <div class="result avro">
+    <pre id="avro-data">{
+  "__avro_schema": "user.v1",
+  "name": "Test User",
+  "email": "test@example.com",
+  "age": 30,
+  "address": {
+    "street": "123 Main St",
+    "city": "New York"
+  }
+}</pre>
+  </div>
+  
+  <h2>2. Protobuf JSON 格式</h2>
+  <button class="protobuf" onclick="copyProtobuf()">复制 Protobuf 测试数据</button>
+  <div class="result protobuf">
+    <pre id="protobuf-data">{
+  "@type": "type.googleapis.com/Order",
+  "orderId": "ORD-12345",
+  "amount": 99.99,
+  "items": [
+    {"id": "ITEM-1", "name": "Product A"},
+    {"id": "ITEM-2", "name": "Product B"}
+  ]
+}</pre>
+  </div>
+  
+  <h2>3. 批量测试数据</h2>
+  <button onclick="copyBatch()">复制批量测试数据</button>
+  <p>（每行一条，可在 Producer 批量发送模式中使用）</p>
+  
+  <h2>验证步骤</h2>
+  <ol>
+    <li>点击按钮复制测试数据</li>
+    <li>打开 Kafkit 应用</li>
+    <li>选择一个 Topic，点击"发送消息"</li>
+    <li>选择"单条"或"批量"模式</li>
+    <li>粘贴测试数据并发送</li>
+    <li>切换到"消费消息"查看展示效果</li>
+  </ol>
+  
+  <h2>预期效果</h2>
+  <ul>
+    <li>Avro 消息：展开后显示 <span style="color: #ff9800; font-weight: bold;">[Avro]</span> 橙色标签</li>
+    <li>Protobuf 消息：展开后显示 <span style="color: #2196f3; font-weight: bold;">[Protobuf JSON]</span> 蓝色标签</li>
+    <li>JSON 内容应正确格式化和高亮显示</li>
+  </ul>
+
+  <script>
+    function copyAvro() {
+      const data = document.getElementById('avro-data').textContent;
+      navigator.clipboard.writeText(data).then(() => {
+        alert('Avro 测试数据已复制！');
+      });
+    }
+    
+    function copyProtobuf() {
+      const data = document.getElementById('protobuf-data').textContent;
+      navigator.clipboard.writeText(data).then(() => {
+        alert('Protobuf 测试数据已复制！');
+      });
+    }
+    
+    function copyBatch() {
+      const batchData = `{"__avro_schema":"user.v1","name":"User 1","age":25}
+{"@type":"Order","orderId":"ORD-001","amount":50.00}
+{"__avro_schema":"user.v1","name":"User 2","age":30}
+{"@type":"Order","orderId":"ORD-002","amount":100.00}`;
+      navigator.clipboard.writeText(batchData).then(() => {
+        alert('批量测试数据已复制！');
+      });
+    }
+  </script>
+</body>
+</html>
