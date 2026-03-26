@@ -8,6 +8,8 @@
     "loading": "加载中...",
     "actions": "操作",
     "unknownError": "未知错误",
+    "unknown": "未知",
+    "all": "全部",
     "save": "保存",
     "edit": "编辑",
     "close": "关闭",
@@ -19,6 +21,7 @@
     "start": "开始",
     "copy": "复制",
     "copied": "已复制",
+    "copyFullJson": "复制完整 JSON",
     "export": "导出",
     "clear": "清空",
     "success": "成功",
@@ -73,7 +76,9 @@
       "clientKey": "客户端密钥路径 (可选)",
       "keytabPath": "Keytab 路径 (可选)",
       "scramMechanism": "SCRAM 机制",
-      "fillTestConfig": "填入测试配置"
+      "fillTestConfig": "填入测试配置",
+      "sslCertificates": "SSL 证书配置",
+      "disableHostnameVerification": "禁用主机名验证（用于自签名证书）"
     },
     "authTypes": {
       "none": "无认证 (PLAINTEXT)",
@@ -82,8 +87,15 @@
       "saslGssapi": "SASL GSSAPI (Kerberos)",
       "ssl": "SSL/TLS"
     },
+    "import": "导入",
+    "export": "导出",
+    "importSuccess": "成功导入 {count} 个连接",
+    "exportSuccess": "成功导出 {count} 个连接",
+    "importError": "导入失败",
+    "exportError": "导出失败",
+    "importResult": "导入完成：成功 {imported} 个，跳过 {skipped} 个",
+    "importErrors": "错误详情",
     "alerts": {
-      "editOnlyInDesktop": "编辑功能需要在桌面端运行",
       "loadFailed": "加载连接失败",
       "saveFailed": "保存失败",
       "testFailed": "测试失败"
@@ -96,6 +108,7 @@
     "name": "Topic 名称",
     "partitions": "分区数",
     "replicationFactor": "副本因子",
+    "replicationFactorHint": "注意：副本因子不能超过 broker 数量，单节点请设置为 1",
     "searchPlaceholder": "搜索 Topic...",
     "viewDetail": "查看详情",
     "consume": "消费消息",
@@ -110,12 +123,31 @@
     "loadError": "加载失败",
     "createError": "创建失败",
     "deleteError": "删除失败",
-    "selectConnection": "请先选择一个连接"
+    "selectConnection": "请先选择一个连接",
+    "import": "导入",
+    "export": "导出",
+    "exportSuccess": "成功导出 {count} 个连接",
+    "exportError": "导出失败",
+    "importResult": "导入完成：成功 {imported} 个，跳过 {skipped} 个",
+    "importErrors": "错误详情",
+    "importError": "导入失败"
   },
   "topicDetail": {
     "title": "Topic 详情",
     "partitions": "分区详情",
     "configs": "配置参数",
+    "editConfigs": "编辑配置",
+    "configName": "配置名",
+    "configValue": "配置值",
+    "configSource": "来源",
+    "configUpdateFailed": "更新配置失败",
+    "configUpdateSuccess": "配置更新成功",
+    "commonConfigs": "常用配置",
+    "otherConfigs": "其他配置",
+    "selectConfig": "选择配置",
+    "addConfig": "添加配置",
+    "saveConfigs": "保存配置",
+    "cancel": "取消",
     "stats": {
       "totalPartitions": "分区总数",
       "totalMessages": "总消息数",
@@ -209,11 +241,14 @@
         "latest": "Latest (最新消息)",
         "earliest": "Earliest (最早消息)",
         "timestamp": "Timestamp (指定时间)",
-        "offset": "Offset (指定偏移量)"
+        "offset": "Offset (指定偏移量)",
+        "latestShort": "Latest",
+        "earliestShort": "Earliest"
       }
     },
     "timeSelector": {
       "label": "时间戳",
+      "shortLabel": "时间",
       "quickSelect": "快速选择",
       "now": "现在",
       "hourAgo": "1小时前",
@@ -238,6 +273,7 @@
       "writtenToFile": "已写入 {count} 条到文件",
       "messageCount": "{count} 条消息",
       "fileMode": "文件保存模式",
+      "preparing": "准备中...",
       "fileModeDesc": "消息将直接保存到文件，不在程序中显示",
       "totalMessages": "共 {count} 条消息",
       "startFrom": "起始: {position}",
@@ -246,13 +282,27 @@
     "alerts": {
       "startFailed": "启动消费失败",
       "exportFailed": "导出失败"
-    }
+    },
+    "searchPlaceholder": "搜索消息内容...",
+    "searchFields": {
+      "all": "全部",
+      "key": "Key",
+      "value": "Value"
+    },
+    "useRegex": "正则",
+    "caseSensitive": "区分大小写",
+    "noSearchResults": "没有匹配的消息",
+    "rowsLeft": "还有 {count} 行数据",
+    "itemsLeft": "还有 {count} 项"
   },
   "consumerGroups": {
     "title": "Consumer Groups",
     "refresh": "刷新",
     "selectGroup": "选择一个 Consumer Group 查看详情",
     "totalLag": "总 Lag",
+    "members": "成员",
+    "coordinator": "协调器",
+    "resetFailed": "重置偏移量失败",
     "columns": {
       "topic": "Topic",
       "partition": "Partition",
@@ -263,10 +313,26 @@
     "status": {
       "loading": "加载中...",
       "noData": "暂无消费进度数据",
+      "noDataHint": "可能原因：1. 消费组尚未开始消费 2. 消费组没有提交过 offset 3. 消费组已过期",
       "empty": "暂无 Consumer Group"
     },
     "errors": {
       "loadFailed": "获取消费组失败"
+    },
+    "resetOffset": {
+      "title": "重置偏移量",
+      "topic": "选择 Topic",
+      "selectTopic": "请选择 Topic",
+      "partition": "选择 Partition",
+      "allPartitions": "所有分区",
+      "strategy": "重置策略",
+      "earliest": "Earliest (最早消息)",
+      "latest": "Latest (最新消息)",
+      "timestamp": "指定时间戳",
+      "specificOffset": "指定 Offset",
+      "offsetPlaceholder": "输入目标 offset 数值",
+      "confirm": "确认重置",
+      "success": "偏移量重置成功"
     }
   },
   "settings": {
@@ -279,7 +345,9 @@
       "system": "跟随系统"
     },
     "about": "关于",
-    "version": "版本"
+    "version": "版本",
+    "kafkaClient": "Kafka 客户端",
+    "appDescription": "使用 Tauri 和 React 构建的跨平台 Kafka 桌面客户端"
   },
   "welcome": {
     "title": "欢迎使用 Kafkit",

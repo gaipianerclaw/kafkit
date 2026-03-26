@@ -1,5 +1,4 @@
 use crate::models::*;
-use crate::models::BatchProduceError;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -8,8 +7,7 @@ use std::time::Duration;
 
 // rdkafka 客户端
 use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer as KafkaConsumer};
-use rdkafka::consumer::StreamConsumer;
+use rdkafka::consumer::{BaseConsumer, Consumer as KafkaConsumer, StreamConsumer};
 use rdkafka::Message as KafkaMessageTrait;
 use rdkafka::topic_partition_list::TopicPartitionList;
 use rdkafka::Offset as KafkaOffset;
@@ -17,7 +15,6 @@ use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::client::DefaultClientContext;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
-use rdkafka::consumer::CommitMode;
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
@@ -82,21 +79,44 @@ impl ConnectionManager {
             SecurityProtocol::SaslSsl => {
                 config.set("security.protocol", "SASL_SSL");
                 
-                // SSL 配置
-                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
-                    if let Some(ca_path) = ca_cert {
-                        config.set("ssl.ca.location", ca_path);
+                // SSL 配置 - 从 SASL 认证配置中获取证书
+                match &connection.auth {
+                    AuthConfig::SaslPlain { ca_cert, client_cert, client_key, .. } |
+                    AuthConfig::SaslScram { ca_cert, client_cert, client_key, .. } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] Setting SSL CA cert: {}", ca_path);
+                            config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] Setting SSL client cert: {}", cert_path);
+                            config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] Setting SSL client key: {}", key_path);
+                            config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(cert_path) = client_cert {
-                        config.set("ssl.certificate.location", cert_path);
+                    AuthConfig::Ssl { ca_cert, client_cert, client_key } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] Setting SSL CA cert: {}", ca_path);
+                            config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] Setting SSL client cert: {}", cert_path);
+                            config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] Setting SSL client key: {}", key_path);
+                            config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(key_path) = client_key {
-                        config.set("ssl.key.location", key_path);
-                    }
-                    let verify_hostname = connection.security.ssl_verify_hostname.unwrap_or(true);
-                    config.set("ssl.endpoint.identification.algorithm", 
-                        if verify_hostname { "https" } else { "none" });
+                    _ => {}
                 }
+                
+                // 主机名验证
+                let verify_hostname = connection.security.ssl_verify_hostname.unwrap_or(true);
+                config.set("ssl.endpoint.identification.algorithm", 
+                    if verify_hostname { "https" } else { "none" });
                 
                 // SASL 配置
                 Self::configure_sasl(&mut config, &connection.auth)?;
@@ -109,12 +129,12 @@ impl ConnectionManager {
     /// 配置 SASL 认证
     fn configure_sasl(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",
@@ -241,6 +261,7 @@ impl ConnectionManager {
 
         // 尝试完整的 Kafka 连接验证
         println!("[Kafkit] Testing Kafka protocol connection...");
+        println!("[Kafkit] Security protocol: {:?}", config.security.protocol);
         
         // 创建一个临时连接来测试
         let mut test_config = ClientConfig::new();
@@ -248,52 +269,105 @@ impl ConnectionManager {
         test_config.set("client.id", "kafkit-test");
         test_config.set("socket.timeout.ms", "10000");
         test_config.set("metadata.request.timeout.ms", "10000");
+        // 添加调试日志
+        test_config.set("debug", "security,broker,protocol");
         
         // 根据安全协议添加配置
         match config.security.protocol {
             SecurityProtocol::Plaintext => {
                 test_config.set("security.protocol", "PLAINTEXT");
+                println!("[Kafkit] Using PLAINTEXT (no authentication)");
             }
             SecurityProtocol::Ssl => {
                 test_config.set("security.protocol", "SSL");
+                println!("[Kafkit] Using SSL authentication");
                 if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &config.auth {
                     if let Some(ca_path) = ca_cert {
+                        println!("[Kafkit] SSL CA cert: {}", ca_path);
                         test_config.set("ssl.ca.location", ca_path);
                     }
                     if let Some(cert_path) = client_cert {
+                        println!("[Kafkit] SSL client cert: {}", cert_path);
                         test_config.set("ssl.certificate.location", cert_path);
                     }
                     if let Some(key_path) = client_key {
+                        println!("[Kafkit] SSL client key: {}", key_path);
                         test_config.set("ssl.key.location", key_path);
                     }
                 }
             }
             SecurityProtocol::SaslPlaintext => {
                 test_config.set("security.protocol", "SASL_PLAINTEXT");
+                println!("[Kafkit] Using SASL_PLAINTEXT authentication");
                 Self::configure_sasl_for_test(&mut test_config, &config.auth)?;
             }
             SecurityProtocol::SaslSsl => {
                 test_config.set("security.protocol", "SASL_SSL");
-                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &config.auth {
-                    if let Some(ca_path) = ca_cert {
-                        test_config.set("ssl.ca.location", ca_path);
+                println!("[Kafkit] Using SASL_SSL authentication");
+                
+                // SSL 配置 - 从 SASL 认证配置中获取证书
+                match &config.auth {
+                    AuthConfig::SaslPlain { ca_cert, client_cert, client_key, .. } |
+                    AuthConfig::SaslScram { ca_cert, client_cert, client_key, .. } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] SSL CA cert: {}", ca_path);
+                            test_config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] SSL client cert: {}", cert_path);
+                            test_config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] SSL client key: {}", key_path);
+                            test_config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(cert_path) = client_cert {
-                        test_config.set("ssl.certificate.location", cert_path);
+                    AuthConfig::Ssl { ca_cert, client_cert, client_key } => {
+                        if let Some(ca_path) = ca_cert {
+                            println!("[Kafkit] SSL CA cert: {}", ca_path);
+                            test_config.set("ssl.ca.location", ca_path);
+                        }
+                        if let Some(cert_path) = client_cert {
+                            println!("[Kafkit] SSL client cert: {}", cert_path);
+                            test_config.set("ssl.certificate.location", cert_path);
+                        }
+                        if let Some(key_path) = client_key {
+                            println!("[Kafkit] SSL client key: {}", key_path);
+                            test_config.set("ssl.key.location", key_path);
+                        }
                     }
-                    if let Some(key_path) = client_key {
-                        test_config.set("ssl.key.location", key_path);
-                    }
+                    _ => {}
                 }
+                
+                // 主机名验证
+                let verify_hostname = config.security.ssl_verify_hostname.unwrap_or(true);
+                test_config.set("ssl.endpoint.identification.algorithm", 
+                    if verify_hostname { "https" } else { "none" });
+                
                 Self::configure_sasl_for_test(&mut test_config, &config.auth)?;
             }
         }
         
+        println!("[Kafkit] Creating Kafka client with config...");
         let test_client: BaseConsumer = test_config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create test client: {}", e)))?;
+            .map_err(|e| {
+                println!("[Kafkit] Failed to create test client: {}", e);
+                AppError::KafkaError(format!("Failed to create test client: {}", e))
+            })?;
         
-        test_client.fetch_metadata(None, Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
+        println!("[Kafkit] Client created, fetching metadata...");
+        match test_client.fetch_metadata(None, Duration::from_secs(10)) {
+            Ok(metadata) => {
+                let broker_count = metadata.brokers().len();
+                let topic_count = metadata.topics().len();
+                println!("[Kafkit] Successfully connected! Found {} brokers, {} topics", 
+                    broker_count, topic_count);
+            }
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch metadata: {}", e);
+                return Err(AppError::KafkaError(format!("Failed to fetch metadata: {}", e)));
+            }
+        }
         
         println!("[Kafkit] Kafka connection test successful");
         Ok(())
@@ -301,29 +375,35 @@ impl ConnectionManager {
     
     fn configure_sasl_for_test(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
+                println!("[Kafkit] SASL/PLAIN: username={}", username);
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",
                 };
+                println!("[Kafkit] SASL/SCRAM: mechanism={}, username={}", mechanism_str, username);
                 config.set("sasl.mechanism", mechanism_str);
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
             AuthConfig::SaslGssapi { principal, keytab_path, service_name } => {
+                println!("[Kafkit] SASL/GSSAPI: principal={}, service={}", principal, service_name);
                 config.set("sasl.mechanism", "GSSAPI");
                 config.set("sasl.kerberos.principal", principal);
                 config.set("sasl.kerberos.service.name", service_name);
                 if let Some(keytab) = keytab_path {
+                    println!("[Kafkit] GSSAPI keytab: {}", keytab);
                     config.set("sasl.kerberos.keytab", keytab);
                 }
             }
-            _ => {}
+            _ => {
+                println!("[Kafkit] Warning: No SASL auth config provided");
+            }
         }
         Ok(())
     }
@@ -547,6 +627,111 @@ impl ConnectionManager {
         Ok(())
     }
 
+    /// 修改 Topic 配置
+    pub async fn alter_topic_configs(
+        &self,
+        connection: &Connection,
+        topic_name: &str,
+        configs: std::collections::HashMap<String, String>,
+    ) -> Result<(), AppError> {
+        println!("[Kafkit] Altering configs for topic: {}", topic_name);
+
+        // 创建 AdminClient 配置
+        let admin_config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = admin_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 构建配置资源
+        use rdkafka::admin::{AlterConfig, ResourceSpecifier};
+        
+        // 使用 AlterConfig 构建器 - API: new(specifier) + set(key, value)
+        let mut alter_config = AlterConfig::new(ResourceSpecifier::Topic(topic_name));
+        
+        // 添加配置项
+        for (key, value) in &configs {
+            alter_config = alter_config.set(key.as_str(), value.as_str());
+        }
+
+        // 执行配置修改
+        let opts = AdminOptions::new();
+        let results = admin.alter_configs(&[alter_config], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to alter topic configs: {}", e)))?;
+
+        // 检查结果
+        for result in results {
+            match result {
+                Ok(resource) => {
+                    println!("[Kafkit] Successfully altered configs for: {:?}", resource);
+                }
+                Err((resource, err)) => {
+                    let msg = format!("Failed to alter configs for {:?}: {}", resource, err);
+                    println!("[Kafkit] {}", msg);
+                    return Err(AppError::KafkaError(msg));
+                }
+            }
+        }
+
+        println!("[Kafkit] Topic '{}' configs altered successfully", topic_name);
+        Ok(())
+    }
+
+    /// 获取 Topic 配置详情
+    pub async fn describe_topic_configs(
+        &self,
+        connection: &Connection,
+        topic_name: &str,
+    ) -> Result<Vec<ConfigEntry>, AppError> {
+        println!("[Kafkit] Describing configs for topic: {}", topic_name);
+
+        // 创建 AdminClient 配置
+        let admin_config = Self::create_client_config(connection)?;
+        
+        // 创建 AdminClient
+        let admin: AdminClient<DefaultClientContext> = admin_config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create admin client: {}", e)))?;
+
+        // 构建配置资源 - describe_configs 接受 ResourceSpecifier 引用
+        use rdkafka::admin::ResourceSpecifier;
+        
+        let resource_specifier = ResourceSpecifier::Topic(topic_name);
+
+        // 获取配置
+        let opts = AdminOptions::new();
+        let results = admin.describe_configs(&[resource_specifier], &opts)
+            .await
+            .map_err(|e| AppError::KafkaError(format!("Failed to describe topic configs: {}", e)))?;
+
+        let mut config_entries = Vec::new();
+
+        // 处理结果
+        for result in results {
+            match result {
+                Ok(config_resource) => {
+                    for entry in config_resource.entries {
+                        config_entries.push(ConfigEntry {
+                            name: entry.name.to_string(),
+                            value: entry.value.unwrap_or_default().to_string(),
+                            default: entry.is_default,
+                            source: format!("{:?}", entry.source),
+                        });
+                    }
+                }
+                Err(err) => {
+                    println!("[Kafkit] Failed to describe configs: {:?}", err);
+                }
+            }
+        }
+
+        // 按名称排序
+        config_entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+        println!("[Kafkit] Found {} config entries for topic '{}'", config_entries.len(), topic_name);
+        Ok(config_entries)
+    }
+
     /// 获取或创建 Producer
     async fn get_producer(&self, connection: &Connection) -> Result<FutureProducer, AppError> {
         let mut producers = self.producers.lock().await;
@@ -733,7 +918,41 @@ impl ConnectionManager {
         Ok(result)
     }
 
+    /// 带重试的获取 committed offsets (同步版本，用于 spawn_blocking)
+    fn fetch_committed_with_retry_sync(
+        client: &BaseConsumer,
+        tpl: &TopicPartitionList,
+        max_retries: u32,
+    ) -> Result<TopicPartitionList, rdkafka::error::KafkaError> {
+        let mut last_error = None;
+        
+        for attempt in 1..=max_retries {
+            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    let error_msg = format!("{}", e);
+                    if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                        return Err(e);
+                    }
+                    
+                    println!("[Kafkit] Retry {}/{} for committed offsets: {}", attempt, max_retries, e);
+                    last_error = Some(e);
+                    
+                    if attempt < max_retries {
+                        std::thread::sleep(Duration::from_millis(100 * attempt as u64));
+                    }
+                }
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| {
+            rdkafka::error::KafkaError::ClientCreation("Max retries exceeded".to_string())
+        }))
+    }
+
+
     /// 获取 Consumer Group 的消费延迟 (Lag)
+    /// 内部使用 spawn_blocking 包装，因为 rdkafka 的一些类型不是 Send
     pub async fn get_consumer_lag(
         &self,
         connection: &Connection,
@@ -741,101 +960,142 @@ impl ConnectionManager {
     ) -> Result<Vec<PartitionLag>, AppError> {
         println!("[Kafkit] Getting consumer lag for group: {}", group_id);
         
+        // 克隆必要的数据用于 spawn_blocking
         let client = self.get_client(connection).await?;
+        let group_id = group_id.to_string();
         
-        // 获取消费组信息 - 使用较短的超时时间
-        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(5)) {
+        // 使用 spawn_blocking 包装同步代码，避免非 Send 类型跨越 await
+        let result = tokio::task::spawn_blocking(move || {
+            Self::get_consumer_lag_sync(&client, &group_id)
+        }).await.map_err(|e| AppError::Other(format!("Task join error: {}", e)))?;
+        
+        result
+    }
+    
+    /// 同步版本的获取 Consumer Lag（用于 spawn_blocking 内部）
+    fn get_consumer_lag_sync(
+        client: &BaseConsumer,
+        group_id: &str,
+    ) -> Result<Vec<PartitionLag>, AppError> {
+        let mut result = Vec::new();
+        let mut processed_partitions = std::collections::HashSet::new();
+        
+        // 首先检查消费组是否存在 - 使用较短的超时时间
+        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(3)) {
             Ok(g) => g,
             Err(e) => {
+                let error_msg = format!("{}", e);
+                if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                    println!("[Kafkit] Consumer group '{}' not found or expired", group_id);
+                    return Ok(vec![]);
+                }
                 println!("[Kafkit] Failed to fetch group info: {}", e);
                 return Ok(vec![]);
             }
         };
         
-        let mut topic_partitions: Vec<(String, i32)> = Vec::new();
-        
-        for group in groups.groups() {
-            if group.name() != group_id {
-                continue;
-            }
-            
-            // 获取该 group 消费的所有 topic-partition
-            for member in group.members() {
-                if let Some(_assignment) = member.assignment() {
-                    // assignment 是 Vec<u8> 类型，包含序列化的数据
-                    let assignment_data: &[u8] = _assignment.as_ref();
-                    if assignment_data.len() >= 4 {
-                        println!("[Kafkit] Member {} has assignment of {} bytes", member.id(), assignment_data.len());
-                    }
-                }
-            }
+        // 检查消费组是否存在
+        let group_exists = groups.groups().iter().any(|g| g.name() == group_id);
+        if !group_exists {
+            println!("[Kafkit] Consumer group '{}' does not exist", group_id);
+            return Ok(vec![]);
         }
         
-        // 如果没有从 assignment 获取到分区，尝试从 committed offsets 获取
-        let mut result = Vec::new();
+        // 获取集群元数据
+        let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
+            Ok(m) => m,
+            Err(e) => {
+                println!("[Kafkit] Failed to fetch metadata: {}", e);
+                return Ok(vec![]);
+            }
+        };
         
-        // 尝试获取所有 topics 的 committed offsets
-        let metadata = client.fetch_metadata(None, Duration::from_secs(10))
-            .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
-        
+        // 为每个 topic 获取 committed offsets
         for topic in metadata.topics() {
             let topic_name = topic.name();
+            let partitions: Vec<i32> = topic.partitions().iter().map(|p| p.id()).collect();
             
-            // 构建 TopicPartitionList
-            let mut tpl = TopicPartitionList::new();
-            for partition in topic.partitions() {
-                tpl.add_partition(topic_name, partition.id());
-            }
-            
-            if tpl.count() == 0 {
+            if partitions.is_empty() {
                 continue;
             }
             
-            // 获取 committed offsets
-            match client.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
-                Ok(committed) => {
-                    // 遍历 committed offsets - 使用 elements() 方法
-                    for el in committed.elements() {
-                        let topic: &str = el.topic();
-                        let partition: i32 = el.partition();
-                        let offset = el.offset();
-                        
-                        // 获取 log end offset
-                        match client.fetch_watermarks(topic, partition, Duration::from_secs(5)) {
-                            Ok((_, high)) => {
-                                let current_offset = offset.to_raw().unwrap_or(-1);
-                                let lag = if current_offset >= 0 {
-                                    high.saturating_sub(current_offset)
-                                } else {
-                                    high
-                                };
-                                
-                                if current_offset >= 0 || lag > 0 {
-                                    result.push(PartitionLag {
-                                        topic: topic.to_string(),
-                                        partition,
-                                        current_offset,
-                                        log_end_offset: high,
-                                        lag,
-                                    });
+            // 分批处理分区，避免一次请求过多
+            for chunk in partitions.chunks(10) {
+                let mut tpl = TopicPartitionList::new();
+                for &partition in chunk {
+                    tpl.add_partition(topic_name, partition);
+                }
+                
+                // 获取 committed offsets，带重试逻辑
+                let committed = match Self::fetch_committed_with_retry_sync(client, &tpl, 3) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let error_msg = format!("{}", e);
+                        if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
+                            println!("[Kafkit] Group '{}' expired during query", group_id);
+                            return Ok(result);
+                        }
+                        println!("[Kafkit] Failed to fetch committed offsets for {}: {}", topic_name, e);
+                        continue;
+                    }
+                };
+                
+                // 处理 committed offsets
+                for el in committed.elements() {
+                    let partition = el.partition();
+                    let offset = el.offset();
+                    let partition_key = format!("{}:{}", topic_name, partition);
+                    
+                    // 避免重复处理
+                    if processed_partitions.contains(&partition_key) {
+                        continue;
+                    }
+                    processed_partitions.insert(partition_key);
+                    
+                    // 获取 log end offset
+                    match client.fetch_watermarks(topic_name, partition, Duration::from_secs(5)) {
+                        Ok((_, high)) => {
+                            let current_offset = match offset {
+                                rdkafka::Offset::Offset(o) => o,
+                                rdkafka::Offset::End => high,
+                                rdkafka::Offset::Beginning => 0,
+                                _ => {
+                                    println!("[Kafkit] Unusual offset state for {}-{}: {:?}", topic_name, partition, offset);
+                                    -1
                                 }
-                            }
-                            Err(e) => {
-                                println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic, partition, e);
-                            }
+                            };
+                            
+                            let lag = if current_offset >= 0 {
+                                high.saturating_sub(current_offset)
+                            } else {
+                                high
+                            };
+                            
+                            result.push(PartitionLag {
+                                topic: topic_name.to_string(),
+                                partition,
+                                current_offset,
+                                log_end_offset: high,
+                                lag,
+                            });
+                        }
+                        Err(e) => {
+                            println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic_name, partition, e);
                         }
                     }
                 }
-                Err(e) => {
-                    println!("[Kafkit] Failed to fetch committed offsets for topic {}: {}", topic_name, e);
-                }
             }
         }
         
-        println!("[Kafkit] Found {} partitions with lag info", result.len());
+        // 按 topic 和 partition 排序
+        result.sort_by(|a, b| {
+            a.topic.cmp(&b.topic).then(a.partition.cmp(&b.partition))
+        });
+        
+        println!("[Kafkit] Found {} partition lag entries for group '{}'", result.len(), group_id);
         Ok(result)
     }
-        
+    
     /// 重置 Consumer Group 的 Offset
     pub async fn reset_consumer_offset(
         &self,
@@ -844,83 +1104,170 @@ impl ConnectionManager {
         topic: &str,
         partition: Option<i32>,
         reset_to: &OffsetResetSpec,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<PartitionOffsetResult>, AppError> {
         println!("[Kafkit] Resetting offset for group: {}, topic: {:?}", group_id, topic);
         
-        // 创建消费者用于获取 offset 信息
-        let consumer_config = Self::create_client_config(connection)?;
-        let consumer: BaseConsumer = consumer_config.create()
+        // 创建消费者配置 - 使用要重置的消费组 group.id
+        let mut config = ClientConfig::new();
+        config.set("bootstrap.servers", &connection.bootstrap_servers.join(","));
+        config.set("group.id", group_id);  // 关键：使用目标消费组 ID
+        config.set("client.id", &format!("kafkit-reset-{}", group_id));
+        config.set("enable.auto.commit", "false");
+        
+        // 根据安全协议配置
+        match connection.security.protocol {
+            SecurityProtocol::Plaintext => {
+                config.set("security.protocol", "PLAINTEXT");
+            }
+            SecurityProtocol::Ssl => {
+                config.set("security.protocol", "SSL");
+                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
+                    if let Some(ca_path) = ca_cert {
+                        config.set("ssl.ca.location", ca_path);
+                    }
+                    if let Some(cert_path) = client_cert {
+                        config.set("ssl.certificate.location", cert_path);
+                    }
+                    if let Some(key_path) = client_key {
+                        config.set("ssl.key.location", key_path);
+                    }
+                }
+            }
+            SecurityProtocol::SaslPlaintext => {
+                config.set("security.protocol", "SASL_PLAINTEXT");
+                Self::configure_sasl(&mut config, &connection.auth)?;
+            }
+            SecurityProtocol::SaslSsl => {
+                config.set("security.protocol", "SASL_SSL");
+                if let AuthConfig::Ssl { ca_cert, client_cert, client_key } = &connection.auth {
+                    if let Some(ca_path) = ca_cert {
+                        config.set("ssl.ca.location", ca_path);
+                    }
+                    if let Some(cert_path) = client_cert {
+                        config.set("ssl.certificate.location", cert_path);
+                    }
+                    if let Some(key_path) = client_key {
+                        config.set("ssl.key.location", key_path);
+                    }
+                }
+                Self::configure_sasl(&mut config, &connection.auth)?;
+            }
+        }
+        
+        // 创建消费者
+        let consumer: BaseConsumer = config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
         
-        // 构建 TopicPartitionList
-        let mut tpl = TopicPartitionList::new();
-        
-        if let Some(p) = partition {
-            tpl.add_partition(topic, p);
+        // 获取目标分区列表
+        let target_partitions: Vec<i32> = if let Some(p) = partition {
+            vec![p]
         } else {
             // 获取 topic 的所有分区
             let metadata = consumer.fetch_metadata(Some(topic), Duration::from_secs(10))
                 .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
             
-            for topic_meta in metadata.topics() {
-                if topic_meta.name() == topic {
-                    for partition_meta in topic_meta.partitions() {
-                        tpl.add_partition(topic, partition_meta.id());
-                    }
-                }
-            }
+            metadata.topics()
+                .iter()
+                .find(|t| t.name() == topic)
+                .map(|t| t.partitions().iter().map(|p| p.id()).collect())
+                .unwrap_or_default()
+        };
+        
+        if target_partitions.is_empty() {
+            return Err(AppError::KafkaError(format!("No partitions found for topic: {}", topic)));
         }
         
-        // 根据 reset_to 类型确定目标 offset
-        for el in tpl.elements() {
-            let t = el.topic();
-            let p = el.partition();
-            
+        // 计算每个分区的目标 offset 并执行 seek
+        let mut reset_results = Vec::new();
+        
+        for p in target_partitions {
             let target_offset = match reset_to {
                 OffsetResetSpec::Earliest => {
-                    // 获取 earliest offset
-                    let (low, _) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
+                    let (low, _) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     low
                 }
                 OffsetResetSpec::Latest => {
-                    // 获取 latest offset
-                    let (_, high) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
+                    let (_, high) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
                         .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
                     high
                 }
-                OffsetResetSpec::Timestamp { timestamp: _ } => {
-                    // 通过时间戳查找 offset - 简化为使用 earliest
-                    // 实际实现需要使用 offsets_for_times
-                    let (low, _) = consumer.fetch_watermarks(t, p, Duration::from_secs(5))
-                        .map_err(|e| AppError::KafkaError(format!("Failed to fetch watermarks: {}", e)))?;
-                    println!("[Kafkit] Timestamp reset not fully implemented, using earliest offset");
-                    low
+                OffsetResetSpec::Timestamp { timestamp } => {
+                    // 通过时间戳查找 offset
+                    let mut tpl = TopicPartitionList::new();
+                    tpl.add_partition_offset(topic, p, KafkaOffset::Offset(*timestamp))
+                        .map_err(|e| AppError::KafkaError(format!("Failed to add partition: {}", e)))?;
+                    
+                    let offsets = consumer.offsets_for_times(tpl, Duration::from_secs(10))
+                        .map_err(|e| AppError::KafkaError(format!("Failed to lookup offset for timestamp: {}", e)))?;
+                    
+                    offsets.elements()
+                        .first()
+                        .and_then(|el| el.offset().to_raw())
+                        .filter(|&o| o >= 0)
+                        .unwrap_or_else(|| {
+                            // 如果时间戳查找失败，使用 earliest
+                            let (low, _) = consumer.fetch_watermarks(topic, p, Duration::from_secs(5))
+                                .unwrap_or((0, 0));
+                            low
+                        })
                 }
-                OffsetResetSpec::Offset { offset } => {
-                    // 直接使用指定的 offset
-                    *offset
-                }
+                OffsetResetSpec::Offset { offset } => *offset,
             };
             
-            println!("[Kafkit] Would reset {}-{} to offset {} (target offset calculated)", t, p, target_offset);
+            println!("[Kafkit] Resetting {}-{} to offset {}", topic, p, target_offset);
+            
+            // 创建 TopicPartitionList 用于 commit
+            let mut tpl = TopicPartitionList::new();
+            tpl.add_partition_offset(topic, p, KafkaOffset::Offset(target_offset))
+                .map_err(|e| AppError::KafkaError(format!("Failed to add partition: {}", e)))?;
+            
+            // 提交偏移量 - 这会重置消费组的偏移量
+            match consumer.commit(&tpl, rdkafka::consumer::CommitMode::Sync) {
+                Ok(_) => {
+                    println!("[Kafkit] Successfully reset offset for {}-{} to {}", topic, p, target_offset);
+                    reset_results.push(PartitionOffsetResult {
+                        topic: topic.to_string(),
+                        partition: p,
+                        offset: target_offset,
+                        success: true,
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to reset offset for {}-{}: {}", topic, p, e);
+                    println!("[Kafkit] {}", error_msg);
+                    reset_results.push(PartitionOffsetResult {
+                        topic: topic.to_string(),
+                        partition: p,
+                        offset: target_offset,
+                        success: false,
+                        error: Some(error_msg),
+                    });
+                }
+            }
         }
         
-        // 注意：rdkafka 的 Rust 版本中没有直接的 alter_consumer_group_offsets 方法
-        // 这需要通过 AdminClient 或手动创建 consumer 并提交 offset 来实现
-        // 目前仅计算目标 offset，实际重置需要使用 Kafka 的 admin 工具或脚本
+        // 检查是否有失败的项
+        let failed_count = reset_results.iter().filter(|r| !r.success).count();
+        if failed_count > 0 && failed_count == reset_results.len() {
+            return Err(AppError::KafkaError(
+                format!("Failed to reset offsets for all {} partitions", failed_count)
+            ));
+        }
         
-        println!("[Kafkit] Offset reset target calculated for group: {} (actual reset requires admin operations)", group_id);
-        Ok(())
+        println!("[Kafkit] Offset reset completed for group: {} ({} succeeded, {} failed)", 
+            group_id, reset_results.len() - failed_count, failed_count);
+        
+        Ok(reset_results)
     }
 }
 
-use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc as StdArc;
 
-// 类型别名简化 StreamConsumer 类型
+// 使用 StreamConsumer 进行异步消息消费
 type KafkaStreamConsumer = StreamConsumer;
 
 pub struct ConsumerService {
@@ -976,6 +1323,11 @@ impl ConsumerService {
         config.set("enable.auto.commit", "false");
         config.set("auto.offset.reset", auto_offset_reset);
         config.set("socket.timeout.ms", "10000");
+        config.set("session.timeout.ms", "10000");
+        config.set("enable.partition.eof", "false");
+        config.set("max.poll.interval.ms", "300000");
+        // 使用经典消费者组协议（避免与 broker 版本不兼容）
+        config.set("group.protocol", "classic");
 
         // 根据安全协议配置
         match connection.security.protocol {
@@ -1017,8 +1369,13 @@ impl ConsumerService {
             }
         }
 
+        // 调试配置
+        config.set("debug", "consumer");
+        
         let consumer: KafkaStreamConsumer = config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
+        
+        println!("[Kafkit] Consumer created successfully for session: {}", session_id);
 
         // 订阅 topic
         if let Some(partition_id) = partition {
@@ -1038,6 +1395,10 @@ impl ConsumerService {
             // 订阅整个 topic
             consumer.subscribe(&[topic])
                 .map_err(|e| AppError::KafkaError(format!("Failed to subscribe: {}", e)))?;
+            
+            // 等待消费者组加入和分区分配
+            println!("[Kafkit] Waiting for consumer group join...");
+            tokio::time::sleep(Duration::from_millis(1000)).await;
             
             // 如果需要从特定 offset 开始消费，手动 seek
             if let Some(offset_val) = specific_offset {
@@ -1257,12 +1618,12 @@ impl ConsumerService {
 
     fn configure_sasl_consumer(config: &mut ClientConfig, auth: &AuthConfig) -> Result<(), AppError> {
         match auth {
-            AuthConfig::SaslPlain { username, password } => {
+            AuthConfig::SaslPlain { username, password, .. } => {
                 config.set("sasl.mechanism", "PLAIN");
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            AuthConfig::SaslScram { mechanism, username, password } => {
+            AuthConfig::SaslScram { mechanism, username, password, .. } => {
                 let mechanism_str = match mechanism {
                     ScramMechanism::Sha256 => "SCRAM-SHA-256",
                     ScramMechanism::Sha512 => "SCRAM-SHA-512",

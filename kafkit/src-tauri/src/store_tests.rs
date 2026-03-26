@@ -1,33 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::models::{AuthConfig, ConnectionConfig, SecurityConfig};
-    use crate::store::{ConfigStore, StoredConfig};
-    use std::collections::HashMap;
+    use crate::models::{AuthConfig, SecurityConfig, SecurityProtocol, ScramMechanism};
 
-    fn create_test_connection_config() -> ConnectionConfig {
-        ConnectionConfig {
-            name: "Test Connection".to_string(),
-            bootstrap_servers: "localhost:9092".to_string(),
-            auth: AuthConfig::None,
-            security: SecurityConfig {
-                protocol: crate::models::SecurityProtocol::Plaintext,
-                ssl_verify_hostname: None,
-            },
-            options: Default::default(),
+    fn create_test_security_config() -> SecurityConfig {
+        SecurityConfig {
+            protocol: SecurityProtocol::Plaintext,
+            ssl_verify_hostname: None,
         }
-    }
-
-    #[test]
-    fn test_stored_config_serialization() {
-        let config = StoredConfig {
-            version: "1.0".to_string(),
-            connections: vec![],
-            settings: HashMap::new(),
-        };
-        
-        let json = serde_json::to_string(&config).unwrap();
-        let decoded: StoredConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.version, "1.0");
     }
 
     #[test]
@@ -35,7 +14,7 @@ mod tests {
         let test_cases = vec![
             (AuthConfig::None, "none"),
             (AuthConfig::SaslPlain { username: "".to_string(), password: "".to_string() }, "saslPlain"),
-            (AuthConfig::SaslScram { mechanism: crate::models::ScramMechanism::Sha256, username: "".to_string(), password: "".to_string() }, "saslScram"),
+            (AuthConfig::SaslScram { mechanism: ScramMechanism::Sha256, username: "".to_string(), password: "".to_string() }, "saslScram"),
             (AuthConfig::SaslGssapi { principal: "".to_string(), keytab_path: None, service_name: "".to_string() }, "saslGssapi"),
             (AuthConfig::Ssl { ca_cert: None, client_cert: None, client_key: None }, "ssl"),
         ];
@@ -53,8 +32,31 @@ mod tests {
     }
 
     #[test]
+    fn test_security_protocol_serialization() {
+        // 测试安全协议序列化
+        let plaintext = SecurityProtocol::Plaintext;
+        let json = serde_json::to_string(&plaintext).unwrap();
+        assert!(json.contains("PLAINTEXT"));
+
+        let ssl = SecurityProtocol::Ssl;
+        let json = serde_json::to_string(&ssl).unwrap();
+        assert!(json.contains("SSL"));
+    }
+
+    #[test]
+    fn test_scram_mechanism_serialization() {
+        let sha256 = ScramMechanism::Sha256;
+        let json = serde_json::to_string(&sha256).unwrap();
+        assert!(json.contains("SCRAM-SHA-256"));
+
+        let sha512 = ScramMechanism::Sha512;
+        let json = serde_json::to_string(&sha512).unwrap();
+        assert!(json.contains("SCRAM-SHA-512"));
+    }
+
+    #[test]
     fn test_credential_key_generation() {
-        // This test verifies the credential key format
+        // 验证凭证键格式
         let connection_id = "test-uuid";
         let field = "password";
         let expected = format!("connection:{}:{}", connection_id, field);

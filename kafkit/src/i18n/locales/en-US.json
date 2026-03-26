@@ -8,6 +8,8 @@
     "loading": "Loading...",
     "actions": "Actions",
     "unknownError": "Unknown error",
+    "unknown": "Unknown",
+    "all": "All",
     "save": "Save",
     "edit": "Edit",
     "close": "Close",
@@ -19,6 +21,7 @@
     "start": "Start",
     "copy": "Copy",
     "copied": "Copied",
+    "copyFullJson": "Copy full JSON",
     "export": "Export",
     "clear": "Clear",
     "success": "Success",
@@ -73,7 +76,9 @@
       "clientKey": "Client Key Path (optional)",
       "keytabPath": "Keytab Path (optional)",
       "scramMechanism": "SCRAM Mechanism",
-      "fillTestConfig": "Fill Test Config"
+      "fillTestConfig": "Fill Test Config",
+      "sslCertificates": "SSL Certificates",
+      "disableHostnameVerification": "Disable hostname verification (for self-signed certs)"
     },
     "authTypes": {
       "none": "No Auth (PLAINTEXT)",
@@ -82,8 +87,15 @@
       "saslGssapi": "SASL GSSAPI (Kerberos)",
       "ssl": "SSL/TLS"
     },
+    "import": "Import",
+    "export": "Export",
+    "importSuccess": "Successfully imported {count} connections",
+    "exportSuccess": "Successfully exported {count} connections",
+    "importError": "Import failed",
+    "exportError": "Export failed",
+    "importResult": "Import completed: {imported} imported, {skipped} skipped",
+    "importErrors": "Error details",
     "alerts": {
-      "editOnlyInDesktop": "Edit feature requires desktop app",
       "loadFailed": "Failed to load connection",
       "saveFailed": "Failed to save",
       "testFailed": "Test failed"
@@ -96,6 +108,7 @@
     "name": "Topic Name",
     "partitions": "Partitions",
     "replicationFactor": "Replication Factor",
+    "replicationFactorHint": "Note: Cannot exceed broker count. Use 1 for single-node Kafka",
     "searchPlaceholder": "Search topics...",
     "viewDetail": "View Details",
     "consume": "Consume Messages",
@@ -110,12 +123,31 @@
     "loadError": "Failed to load",
     "createError": "Failed to create",
     "deleteError": "Failed to delete",
-    "selectConnection": "Please select a connection first"
+    "selectConnection": "Please select a connection first",
+    "import": "Import",
+    "export": "Export",
+    "exportSuccess": "Successfully exported {count} connections",
+    "exportError": "Export failed",
+    "importResult": "Import complete: {imported} imported, {skipped} skipped",
+    "importErrors": "Error details",
+    "importError": "Import failed"
   },
   "topicDetail": {
     "title": "Topic Details",
     "partitions": "Partition Details",
     "configs": "Configuration",
+    "editConfigs": "Edit Configs",
+    "configName": "Config",
+    "configValue": "Value",
+    "configSource": "Source",
+    "configUpdateFailed": "Failed to update configs",
+    "configUpdateSuccess": "Configs updated successfully",
+    "commonConfigs": "Common Configs",
+    "otherConfigs": "Other Configs",
+    "selectConfig": "Select config",
+    "addConfig": "Add",
+    "saveConfigs": "Save",
+    "cancel": "Cancel",
     "stats": {
       "totalPartitions": "Total Partitions",
       "totalMessages": "Total Messages",
@@ -209,11 +241,14 @@
         "latest": "Latest (newest messages)",
         "earliest": "Earliest (oldest messages)",
         "timestamp": "Timestamp (specific time)",
-        "offset": "Offset (specific offset)"
+        "offset": "Offset (specific offset)",
+        "latestShort": "Latest",
+        "earliestShort": "Earliest"
       }
     },
     "timeSelector": {
       "label": "Timestamp",
+      "shortLabel": "Time",
       "quickSelect": "Quick Select",
       "now": "Now",
       "hourAgo": "1 hour ago",
@@ -238,6 +273,7 @@
       "writtenToFile": "Written {count} messages to file",
       "messageCount": "{count} messages",
       "fileMode": "File Save Mode",
+      "preparing": "Preparing...",
       "fileModeDesc": "Messages will be saved directly to file, not displayed in app",
       "totalMessages": "{count} messages total",
       "startFrom": "Start: {position}",
@@ -246,13 +282,27 @@
     "alerts": {
       "startFailed": "Failed to start consuming",
       "exportFailed": "Export failed"
-    }
+    },
+    "searchPlaceholder": "Search in messages...",
+    "searchFields": {
+      "all": "All",
+      "key": "Key",
+      "value": "Value"
+    },
+    "useRegex": "Regex",
+    "caseSensitive": "Match case",
+    "noSearchResults": "No messages match your search",
+    "rowsLeft": "{count} more rows",
+    "itemsLeft": "{count} more items"
   },
   "consumerGroups": {
     "title": "Consumer Groups",
     "refresh": "Refresh",
     "selectGroup": "Select a Consumer Group to view details",
     "totalLag": "Total Lag",
+    "members": "Members",
+    "coordinator": "Coordinator",
+    "resetFailed": "Failed to reset offset",
     "columns": {
       "topic": "Topic",
       "partition": "Partition",
@@ -263,10 +313,26 @@
     "status": {
       "loading": "Loading...",
       "noData": "No consumption data",
+      "noDataHint": "Possible reasons: 1. Group has not started consuming 2. No offsets committed 3. Group expired",
       "empty": "No Consumer Groups"
     },
     "errors": {
       "loadFailed": "Failed to load consumer groups"
+    },
+    "resetOffset": {
+      "title": "Reset Offset",
+      "topic": "Select Topic",
+      "selectTopic": "Select a topic",
+      "partition": "Select Partition",
+      "allPartitions": "All Partitions",
+      "strategy": "Reset Strategy",
+      "earliest": "Earliest (oldest messages)",
+      "latest": "Latest (newest messages)",
+      "timestamp": "Specific Timestamp",
+      "specificOffset": "Specific Offset",
+      "offsetPlaceholder": "Enter target offset value",
+      "confirm": "Confirm Reset",
+      "success": "Offset reset successfully"
     }
   },
   "settings": {
@@ -279,7 +345,9 @@
       "system": "System"
     },
     "about": "About",
-    "version": "Version"
+    "version": "Version",
+    "kafkaClient": "Kafka Client",
+    "appDescription": "A cross-platform Kafka desktop client built with Tauri and React"
   },
   "welcome": {
     "title": "Welcome to Kafkit",

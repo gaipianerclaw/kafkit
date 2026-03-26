@@ -20,6 +20,8 @@ i18n
     fallbackLng: 'zh-CN',
     interpolation: {
       escapeValue: false,
+      prefix: '{',
+      suffix: '}',
     },
     detection: {
       order: ['localStorage', 'navigator', 'htmlTag'],

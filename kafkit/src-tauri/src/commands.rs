@@ -209,6 +209,51 @@ pub async fn delete_topic(
     state.connection_manager.delete_topic(&connection, &topic).await
 }
 
+// ================= Topic 配置编辑 =================
+
+#[tauri::command]
+pub async fn get_topic_configs(
+    connection_id: String,
+    topic: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ConfigEntry>> {
+    println!("[Kafkit] Getting topic configs for: {}", topic);
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 获取 topic 配置
+    state.connection_manager.describe_topic_configs(&connection, &topic).await
+}
+
+#[tauri::command]
+pub async fn update_topic_configs(
+    connection_id: String,
+    topic: String,
+    configs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<()> {
+    println!("[Kafkit] Updating topic configs for: {}", topic);
+    
+    // 获取连接信息
+    let connection = {
+        let store = state.config_store.lock().await;
+        let connections = store.get_connections().await?;
+        connections.into_iter()
+            .find(|c| c.id == connection_id)
+            .ok_or_else(|| AppError::ConnectionNotFound(connection_id))?
+    };
+    
+    // 修改 topic 配置
+    state.connection_manager.alter_topic_configs(&connection, &topic, configs).await
+}
+
 #[tauri::command]
 pub async fn start_consuming(
     connection_id: String,
@@ -248,12 +293,12 @@ pub async fn stop_consuming(
 
 #[tauri::command]
 pub async fn fetch_messages(
-    connection_id: String,
+    _connection_id: String,
     topic: String,
     partition: i32,
     offset: i64,
-    limit: i32,
-    state: State<'_, AppState>,
+    _limit: i32,
+    _state: State<'_, AppState>,
 ) -> Result<serde_json::Value> {
     println!("[Kafkit] Fetch messages from {} partition {} offset {}", topic, partition, offset);
     // TODO: 实现真实的消息获取
@@ -357,7 +402,7 @@ pub async fn reset_consumer_offset(
     partition: Option<i32>,
     reset_to: OffsetResetSpec,
     state: State<'_, AppState>,
-) -> Result<()> {
+) -> Result<Vec<PartitionOffsetResult>> {
     println!("[Kafkit] Resetting offset for group: {}", group_id);
     
     // 获取连接信息
@@ -398,4 +443,146 @@ pub async fn append_to_file(
     file.write_all(content.as_bytes())
         .map_err(|e| AppError::Other(format!("Failed to append to file: {}", e)))?;
     Ok(())
+}
+
+// ================= 连接配置导入导出 =================
+
+#[tauri::command]
+pub async fn export_connections(
+    file_path: String,
+    connection_ids: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<usize> {
+    println!("[Kafkit] Exporting connections to: {}", file_path);
+    
+    let store = state.config_store.lock().await;
+    let connections = store.get_connections().await?;
+    
+    // 如果指定了连接ID列表，则只导出这些连接
+    let connections_to_export: Vec<Connection> = match connection_ids {
+        Some(ids) => connections.into_iter()
+            .filter(|c| ids.contains(&c.id))
+            .collect(),
+        None => connections,
+    };
+    
+    let export_count = connections_to_export.len();
+    
+    // 构建导出数据结构
+    #[derive(serde::Serialize)]
+    struct ExportData {
+        version: String,
+        export_time: String,
+        connections: Vec<Connection>,
+    }
+    
+    let export_data = ExportData {
+        version: "1.0".to_string(),
+        export_time: chrono::Utc::now().to_rfc3339(),
+        connections: connections_to_export,
+    };
+    
+    let content = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| AppError::Other(format!("Failed to serialize connections: {}", e)))?;
+    
+    std::fs::write(&file_path, content)
+        .map_err(|e| AppError::Other(format!("Failed to write export file: {}", e)))?;
+    
+    println!("[Kafkit] Exported {} connections", export_count);
+    Ok(export_count)
+}
+
+#[tauri::command]
+pub async fn import_connections(
+    file_path: String,
+    skip_existing: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<ImportResult> {
+    use std::collections::HashSet;
+    
+    println!("[Kafkit] Importing connections from: {}", file_path);
+    
+    // 读取文件内容
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| AppError::Other(format!("Failed to read import file: {}", e)))?;
+    
+    // 解析导入数据
+    #[derive(serde::Deserialize)]
+    struct ImportData {
+        #[allow(dead_code)]
+        version: Option<String>,
+        #[allow(dead_code)]
+        export_time: Option<String>,
+        connections: Vec<Connection>,
+    }
+    
+    let import_data: ImportData = serde_json::from_str(&content)
+        .map_err(|e| AppError::Other(format!("Invalid import file format: {}", e)))?;
+    
+    // 获取现有连接的名称集合（用于去重检查）
+    let store = state.config_store.lock().await;
+    let existing_connections = store.get_connections().await?;
+    let existing_names: HashSet<String> = existing_connections
+        .iter()
+        .map(|c| c.name.clone())
+        .collect();
+    
+    drop(store); // 释放锁，后续操作需要重新获取
+    
+    let skip_existing = skip_existing.unwrap_or(true);
+    let mut imported = 0;
+    let mut skipped = 0;
+    let mut errors = Vec::new();
+    
+    for mut conn in import_data.connections {
+        // 检查是否已存在同名连接
+        if skip_existing && existing_names.contains(&conn.name) {
+            println!("[Kafkit] Skipping existing connection: {}", conn.name);
+            skipped += 1;
+            continue;
+        }
+        
+        // 生成新ID，避免与现有连接冲突
+        conn.id = uuid::Uuid::new_v4().to_string();
+        conn.created_at = chrono::Utc::now().to_rfc3339();
+        conn.updated_at = chrono::Utc::now().to_rfc3339();
+        
+        // 转换为 ConnectionConfig
+        let config = ConnectionConfig {
+            name: conn.name.clone(),
+            bootstrap_servers: conn.bootstrap_servers.join(","),
+            auth: conn.auth,
+            security: conn.security,
+            options: conn.options,
+        };
+        
+        // 创建连接
+        let store = state.config_store.lock().await;
+        match store.create_connection(config).await {
+            Ok(_) => {
+                println!("[Kafkit] Imported connection: {}", conn.name);
+                imported += 1;
+            }
+            Err(e) => {
+                println!("[Kafkit] Failed to import connection {}: {:?}", conn.name, e);
+                errors.push(format!("{}: {}", conn.name, e));
+            }
+        }
+    }
+    
+    println!("[Kafkit] Import complete: {} imported, {} skipped, {} errors", 
+             imported, skipped, errors.len());
+    
+    Ok(ImportResult {
+        imported,
+        skipped,
+        errors,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct ImportResult {
+    imported: usize,
+    skipped: usize,
+    errors: Vec<String>,
 }

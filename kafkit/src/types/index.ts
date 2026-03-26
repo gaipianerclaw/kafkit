@@ -23,8 +23,8 @@ export interface Connection {
 
 export type AuthConfig =
   | { type: 'none' }
-  | { type: 'saslPlain'; username: string; password: string }
-  | { type: 'saslScram'; mechanism: 'SCRAM-SHA-256' | 'SCRAM-SHA-512'; username: string; password: string }
+  | { type: 'saslPlain'; username: string; password: string; caCert?: string; clientCert?: string; clientKey?: string }
+  | { type: 'saslScram'; mechanism: 'SCRAM-SHA-256' | 'SCRAM-SHA-512'; username: string; password: string; caCert?: string; clientCert?: string; clientKey?: string }
   | { type: 'saslGssapi'; principal: string; keytabPath?: string; serviceName: string }
   | { type: 'ssl'; caCert?: string; clientCert?: string; clientKey?: string };
 

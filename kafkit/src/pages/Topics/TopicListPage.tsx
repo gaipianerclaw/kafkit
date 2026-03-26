@@ -91,6 +91,9 @@ function CreateTopicDialog({
                 value={replicas}
                 onChange={e => setReplicas(parseInt(e.target.value) || 1)}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('topics.replicationFactorHint') || '注意：单节点 Kafka 只能设置为 1'}
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">

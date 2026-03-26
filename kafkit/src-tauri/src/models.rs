@@ -32,12 +32,25 @@ pub enum AuthConfig {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "saslPlain")]
-    SaslPlain { username: String, password: String },
+    #[serde(rename_all = "camelCase")]
+    SaslPlain { 
+        username: String, 
+        password: String,
+        // 可选的 SSL 证书（用于 SASL_SSL）
+        ca_cert: Option<String>,
+        client_cert: Option<String>,
+        client_key: Option<String>,
+    },
     #[serde(rename = "saslScram")]
+    #[serde(rename_all = "camelCase")]
     SaslScram {
         mechanism: ScramMechanism,
         username: String,
         password: String,
+        // 可选的 SSL 证书（用于 SASL_SSL）
+        ca_cert: Option<String>,
+        client_cert: Option<String>,
+        client_key: Option<String>,
     },
     #[serde(rename = "saslGssapi")]
     #[serde(rename_all = "camelCase")]
@@ -259,6 +272,18 @@ pub enum OffsetResetSpec {
     Timestamp { timestamp: i64 },
     #[serde(rename = "offset")]
     Offset { offset: i64 },
+}
+
+/// 分区偏移量重置结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PartitionOffsetResult {
+    pub topic: String,
+    pub partition: i32,
+    pub offset: i64,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 // ================= Error Models =================

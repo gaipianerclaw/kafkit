@@ -6,6 +6,13 @@ mod models;
 mod services;
 mod store;
 
+#[cfg(test)]
+mod models_tests;
+#[cfg(test)]
+mod services_tests;
+#[cfg(test)]
+mod store_tests;
+
 use commands::*;
 use services::{ConnectionManager, ConsumerService};
 use store::ConfigStore;
@@ -34,12 +41,13 @@ pub fn run() {
                 config_store,
             });
             
-            // 获取主窗口并打开开发者工具
-            #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
-            }
+            // 开发模式下可通过快捷键手动打开开发者工具 (Cmd+Option+I on macOS, Ctrl+Shift+I on Windows/Linux)
+            // 如需自动打开，取消下面注释：
+            // #[cfg(debug_assertions)]
+            // {
+            //     let window = app.get_webview_window("main").unwrap();
+            //     window.open_devtools();
+            // }
             
             Ok(())
         })
@@ -51,11 +59,16 @@ pub fn run() {
             create_connection,
             update_connection,
             delete_connection,
+            // Connection Import/Export
+            export_connections,
+            import_connections,
             // Topic
             list_topics,
             get_topic_detail,
             create_topic,
             delete_topic,
+            get_topic_configs,
+            update_topic_configs,
             // Consumer
             start_consuming,
             stop_consuming,

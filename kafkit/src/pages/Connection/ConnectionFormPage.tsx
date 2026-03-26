@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
+import { getConnection } from '../../services/tauriService';
 import type { ConnectionConfig, AuthConfig, SecurityConfig } from '../../types';
 import { useTranslation } from 'react-i18next';
 
@@ -42,20 +43,36 @@ export function ConnectionFormPage() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    if (isEdit && id) {
+    if (isEdit && id && !hasLoaded) {
       loadConnection(id);
     }
-  }, [id]);
+  }, [id, hasLoaded, isEdit]);
 
-  const loadConnection = async (_connId: string) => {
+  const loadConnection = async (connId: string) => {
+    if (hasLoaded) return;
+    setHasLoaded(true);
+    
     try {
-      // 这里应该从 API 获取，暂时使用简化方式
-      alert(t('connections.alerts.editOnlyInDesktop'));
-      navigate('/main/connections');
-      // setFormData...
+      console.log('[Kafkit] Loading connection:', connId);
+      // 直接从 API 获取连接详情
+      const connection = await getConnection(connId);
+      
+      // 加载连接数据到表单（bootstrapServers 从数组转换为逗号分隔的字符串）
+      setFormData({
+        name: connection.name,
+        bootstrapServers: Array.isArray(connection.bootstrapServers) 
+          ? connection.bootstrapServers.join(', ')
+          : connection.bootstrapServers,
+        auth: connection.auth || { type: 'none' },
+        security: connection.security || { protocol: 'PLAINTEXT' },
+        options: connection.options || {},
+      });
+      console.log('[Kafkit] Connection loaded:', connection.name);
     } catch (error) {
+      console.error('[Kafkit] Failed to load connection:', error);
       alert(t('connections.alerts.loadFailed'));
       navigate('/main/connections');
     } finally {
@@ -310,16 +327,16 @@ export function ConnectionFormPage() {
                 let newAuth: AuthConfig;
                 switch (authType) {
                   case 'saslPlain':
-                    newAuth = { type: 'saslPlain', username: '', password: '' };
+                    newAuth = { type: 'saslPlain', username: '', password: '', caCert: '', clientCert: '', clientKey: '' };
                     break;
                   case 'saslScram':
-                    newAuth = { type: 'saslScram', mechanism: 'SCRAM-SHA-256', username: '', password: '' };
+                    newAuth = { type: 'saslScram', mechanism: 'SCRAM-SHA-256', username: '', password: '', caCert: '', clientCert: '', clientKey: '' };
                     break;
                   case 'saslGssapi':
                     newAuth = { type: 'saslGssapi', principal: '', serviceName: 'kafka' };
                     break;
                   case 'ssl':
-                    newAuth = { type: 'ssl' };
+                    newAuth = { type: 'ssl', caCert: '', clientCert: '', clientKey: '' };
                     break;
                   default:
                     newAuth = { type: 'none' };
@@ -330,6 +347,46 @@ export function ConnectionFormPage() {
             />
 
             {renderAuthFields()}
+            
+            {/* SSL 证书配置 - 当协议为 SSL 或 SASL_SSL 时显示 */}
+            {(formData.security.protocol === 'SSL' || formData.security.protocol === 'SASL_SSL') && (
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-medium text-muted-foreground">{t('connections.form.sslCertificates') || 'SSL 证书配置'}</h3>
+                <div className="text-xs text-muted-foreground mb-2">
+                  证书路径示例: /Users/xxx/path/to/ca-cert.pem (macOS) 或 C:\\Users\\xxx\\path\\to\\ca-cert.pem (Windows)
+                </div>
+                <Input
+                  label={t('connections.form.caCert')}
+                  value={(formData.auth as { caCert?: string }).caCert || ''}
+                  onChange={e => updateAuth({ caCert: e.target.value })}
+                  placeholder="/path/to/ca-cert.pem"
+                />
+                <Input
+                  label={t('connections.form.clientCert')}
+                  value={(formData.auth as { clientCert?: string }).clientCert || ''}
+                  onChange={e => updateAuth({ clientCert: e.target.value })}
+                  placeholder="/path/to/client.crt (可选)"
+                />
+                <Input
+                  label={t('connections.form.clientKey')}
+                  value={(formData.auth as { clientKey?: string }).clientKey || ''}
+                  onChange={e => updateAuth({ clientKey: e.target.value })}
+                  placeholder="/path/to/client.key (可选)"
+                />
+                <label className="flex items-center space-x-2 pt-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.security.sslVerifyHostname === false}
+                    onChange={e => setFormData(prev => ({
+                      ...prev,
+                      security: { ...prev.security, sslVerifyHostname: !e.target.checked }
+                    }))}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-muted-foreground">{t('connections.form.disableHostnameVerification') || '禁用主机名验证（用于自签名证书）'}</span>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Test Result */}

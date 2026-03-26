@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, Trash2, Download, Copy, Check, ChevronDown, ChevronRight, Settings2, FileText, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -76,6 +76,7 @@ const detectContentType = (str: string): ContentType => {
 
 // CSV 表格渲染器
 const CsvRenderer = ({ data }: { data: string }) => {
+  const { t } = useTranslation();
   const lines = data.trim().split('\n');
   if (lines.length === 0) return null;
   
@@ -135,7 +136,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
       </table>
       {hasMore && (
         <div className="text-xs text-muted-foreground text-center py-2">
-          ... 还有 {rows.length - 20} 行数据
+          ... {t('consumer.rowsLeft', { count: rows.length - 20 })}
         </div>
       )}
     </div>
@@ -144,6 +145,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
 
 // JSON 语法高亮渲染器
 const JsonRenderer = ({ data }: { data: unknown }) => {
+  const { t } = useTranslation();
   const renderValue = (value: unknown, depth = 0): JSX.Element => {
     const indent = '  '.repeat(depth);
     
@@ -179,7 +181,7 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
               </div>
             ))}
             {hasMore && (
-              <div className="text-muted-foreground">... 还有 {value.length - 50} 项</div>
+              <div className="text-muted-foreground">... {t('consumer.itemsLeft', { count: value.length - 50 })}</div>
             )}
           </div>
           <span>{indent}]</span>
@@ -223,6 +225,7 @@ const MessageItem = memo(({ msg, index }: {
   msg: KafkaMessage;
   index: number;
 }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -316,7 +319,7 @@ const MessageItem = memo(({ msg, index }: {
             copyFullJson();
           }}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground justify-self-center"
-          title="复制完整 JSON"
+          title={t('consumer.copyFullJson')}
         >
           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
@@ -618,6 +621,12 @@ export function ConsumerPage() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
   const [previewLimit, setPreviewLimit] = useState('500');
+  
+  // 搜索过滤相关状态
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<'all' | 'key' | 'value'>('all');
+  const [useRegex, setUseRegex] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
   const [consumerConfig, setConsumerConfig] = useState<ConsumerConfig>({
     offsetType: 'latest',
     mode: 'preview',
@@ -843,30 +852,7 @@ export function ConsumerPage() {
     if (!activeConnection || !topic) return;
 
     try {
-      // 如果是文件模式，先初始化文件
-      if (consumerConfig.mode === 'file') {
-        const initialized = await initFileWriter();
-        if (!initialized) {
-          console.log('[Kafkit] User cancelled file save dialog');
-          return;
-        }
-      }
-
-      const tauriService = await getService();
-      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
-      const offsetSpec = buildOffsetSpec();
-      
-      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
-      
-      const sid = await tauriService.startConsuming(
-        activeConnection,
-        decodedTopic,
-        partition,
-        offsetSpec
-      );
-      setSessionId(sid);
-      setIsConsuming(true);
-
+      // 先设置事件监听，避免错过早期消息
       const tauriEvent = await getTauriEvent();
       
       if (tauriEvent && tauriEvent.listen) {
@@ -885,8 +871,42 @@ export function ConsumerPage() {
         });
         unlistenRef.current = unlisten;
       }
+
+      // 如果是文件模式，先初始化文件
+      if (consumerConfig.mode === 'file') {
+        const initialized = await initFileWriter();
+        if (!initialized) {
+          console.log('[Kafkit] User cancelled file save dialog');
+          // 取消监听
+          if (unlistenRef.current) {
+            unlistenRef.current();
+            unlistenRef.current = null;
+          }
+          return;
+        }
+      }
+
+      const tauriService = await getService();
+      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
+      const offsetSpec = buildOffsetSpec();
+      
+      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
+      
+      const sid = await tauriService.startConsuming(
+        activeConnection,
+        decodedTopic,
+        partition,
+        offsetSpec
+      );
+      setSessionId(sid);
+      setIsConsuming(true);
     } catch (err) {
       alert(t('consumer.alerts.startFailed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+      // 出错时清理监听
+      if (unlistenRef.current) {
+        unlistenRef.current();
+        unlistenRef.current = null;
+      }
     }
   };
 
@@ -921,6 +941,47 @@ export function ConsumerPage() {
   const clearMessages = () => {
     setMessages([]);
   };
+
+  // 消息过滤逻辑
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+
+    const query = searchQuery.trim();
+    let regex: RegExp | null = null;
+
+    if (useRegex) {
+      try {
+        const flags = caseSensitive ? '' : 'i';
+        regex = new RegExp(query, flags);
+      } catch (e) {
+        // 正则表达式无效，返回所有消息
+        return messages;
+      }
+    }
+
+    return messages.filter(msg => {
+      const searchInField = (field: string | undefined) => {
+        if (!field) return false;
+        if (useRegex && regex) {
+          return regex.test(field);
+        }
+        if (caseSensitive) {
+          return field.includes(query);
+        }
+        return field.toLowerCase().includes(query.toLowerCase());
+      };
+
+      switch (searchField) {
+        case 'key':
+          return searchInField(msg.key);
+        case 'value':
+          return searchInField(msg.value);
+        case 'all':
+        default:
+          return searchInField(msg.key) || searchInField(msg.value);
+      }
+    });
+  }, [messages, searchQuery, searchField, useRegex, caseSensitive]);
 
   // t('consumer.export')数据 - 使用文件选择对话框
   const exportMessages = async (format: 'json' | 'csv' = 'json') => {
@@ -1047,17 +1108,17 @@ export function ConsumerPage() {
 
   const partitionOptions = detail 
     ? [
-        { value: 'all', label: t('consumer.columns.partition') + ': All' },
+        { value: 'all', label: t('consumer.columns.partition') + ': ' + t('common.all') },
         ...detail.partitions.map(p => ({ value: String(p.partition), label: `P${p.partition}` }))
       ]
-    : [{ value: 'all', label: t('consumer.columns.partition') + ': All' }];
+    : [{ value: 'all', label: t('consumer.columns.partition') + ': ' + t('common.all') }];
 
   const getOffsetLabel = () => {
     switch (consumerConfig.offsetType) {
-      case 'earliest': return 'Earliest';
-      case 'timestamp': return 'Time';
+      case 'earliest': return t('consumer.config.positions.earliestShort') || 'Earliest';
+      case 'timestamp': return t('consumer.timeSelector.shortLabel') || 'Time';
       case 'offset': return `Offset:${consumerConfig.offsetValue}`;
-      default: return 'Latest';
+      default: return t('consumer.config.positions.latestShort') || 'Latest';
     }
   };
 
@@ -1068,7 +1129,7 @@ export function ConsumerPage() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 h-14 border-b border-border flex items-center justify-between px-4 bg-background z-20">
+      <div className="flex-shrink-0 min-h-14 border-b border-border flex items-center justify-between px-4 py-2 bg-background z-20 flex-wrap gap-y-2">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -1124,7 +1185,7 @@ export function ConsumerPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* 分区选择 */}
           <Select
             value={selectedPartition}
@@ -1228,14 +1289,83 @@ export function ConsumerPage() {
       {/* 预览模式：表头和消息列表 */}
       {consumerConfig.mode === 'preview' && (
         <>
+          {/* 搜索过滤栏 */}
+          {messages.length > 0 && (
+            <div className="flex-shrink-0 px-3 py-2 bg-muted/30 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('consumer.searchPlaceholder') || 'Search in messages...'}
+                    className="w-full h-8 px-3 pl-9 text-sm border border-border rounded bg-background"
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                
+                <select
+                  value={searchField}
+                  onChange={(e) => setSearchField(e.target.value as 'all' | 'key' | 'value')}
+                  className="h-8 px-2 text-sm border border-border rounded bg-background"
+                >
+                  <option value="all">{t('consumer.searchFields.all') || 'All'}</option>
+                  <option value="key">{t('consumer.searchFields.key') || 'Key'}</option>
+                  <option value="value">{t('consumer.searchFields.value') || 'Value'}</option>
+                </select>
+                
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={useRegex}
+                    onChange={(e) => setUseRegex(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  {t('consumer.useRegex') || 'Regex'}
+                </label>
+                
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={caseSensitive}
+                    onChange={(e) => setCaseSensitive(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  {t('consumer.caseSensitive') || 'Aa'}
+                </label>
+                
+                {searchQuery && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {filteredMessages.length} / {messages.length}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 表头 */}
           <div className="flex-shrink-0 grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
             <span></span>
             <span>{t('consumer.columns.index')}</span>
             <span>{t('consumer.columns.partition')}</span>
-            <span>Offset</span>
+            <span>{t('consumer.columns.offset')}</span>
             <span>{t('consumer.columns.timestamp')}</span>
-            <span>Key</span>
+            <span>{t('consumer.columns.key')}</span>
             <span>{t('consumer.columns.value')}</span>
             <span className="text-center">{t('consumer.columns.actions')}</span>
           </div>
@@ -1258,13 +1388,17 @@ export function ConsumerPage() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 {isConsuming ? t('consumer.waiting') : t('consumer.clickToStart')}
               </div>
+            ) : filteredMessages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                {t('consumer.noSearchResults') || 'No messages match your search'}
+              </div>
             ) : (
               <div>
-                {messages.map((msg, idx) => (
+                {filteredMessages.map((msg, idx) => (
                   <MessageItem
                     key={`${msg.partition}-${msg.offset}-${idx}`}
                     msg={msg}
-                    index={idx}
+                    index={messages.indexOf(msg)}
                   />
                 ))}
                 <div ref={messagesEndRef} className="h-4" />
@@ -1282,7 +1416,7 @@ export function ConsumerPage() {
             <div className="text-center">
               <p className="text-lg font-medium text-foreground mb-2">{t('consumer.status.writing')}</p>
               <p className="text-sm">{t('consumer.status.written', { count: fileMessageCount })}</p>
-              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || 'Preparing...'}</p>
+              <p className="text-xs mt-2 text-muted-foreground">{filePathRef.current || t('consumer.status.preparing')}</p>
             </div>
           ) : (
             <div className="text-center">
@@ -1312,7 +1446,7 @@ export function ConsumerPage() {
           {isConsuming && (
             <span className="flex items-center gap-1.5 text-green-600">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              t('consumer.status.consuming')
+              {t('consumer.status.consuming')}
             </span>
           )}
         </div>

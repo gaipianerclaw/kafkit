@@ -82,14 +82,14 @@ export function SettingsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('settings.version')}</span>
-              <span className="font-mono">1.0.1</span>
+              <span className="font-mono">1.0.2</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Kafka Client</span>
+              <span className="text-muted-foreground">{t('settings.kafkaClient')}</span>
               <span className="font-mono">rdkafka</span>
             </div>
             <p className="text-muted-foreground mt-4">
-              A cross-platform Kafka desktop client built with Tauri and React.
+              {t('settings.appDescription')}
             </p>
           </div>
         </div>
