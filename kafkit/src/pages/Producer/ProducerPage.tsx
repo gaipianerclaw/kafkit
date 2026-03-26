@@ -249,7 +249,7 @@ export function ProducerPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center">
@@ -298,7 +298,7 @@ export function ProducerPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-6 overflow-auto min-h-0">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Format & Tools */}
           <div className="flex items-center gap-4">

@@ -132,7 +132,7 @@ export function TopicDetailPage() {
   } : null;
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center">
@@ -173,7 +173,7 @@ export function TopicDetailPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 overflow-auto">
+      <div className="flex-1 p-4 overflow-auto min-h-0">
         {error && (
           <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-lg">
             {error}

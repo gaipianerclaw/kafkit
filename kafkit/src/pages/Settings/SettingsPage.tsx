@@ -24,7 +24,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 overflow-auto">
+    <div className="flex-1 h-full p-6 overflow-auto min-h-0">
       <h1 className="text-2xl font-bold mb-6">{t('settings.title')}</h1>
 
       <div className="max-w-2xl space-y-6">

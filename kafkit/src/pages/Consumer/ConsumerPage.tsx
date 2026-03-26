@@ -1373,7 +1373,7 @@ export function ConsumerPage() {
           {/* Messages */}
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto bg-background"
+            className="flex-1 overflow-y-auto bg-background min-h-0"
             onScroll={() => {
               if (scrollContainerRef.current) {
                 const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;

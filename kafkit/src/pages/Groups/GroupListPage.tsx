@@ -353,7 +353,7 @@ export function GroupListPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4">
         <h1 className="text-lg font-semibold">{t('consumerGroups.title')}</h1>
@@ -366,7 +366,7 @@ export function GroupListPage() {
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Group List */}
-        <div className="w-80 border-r border-border overflow-auto">
+        <div className="w-80 border-r border-border overflow-auto min-h-0">
           {error && (
             <div className="p-4 bg-red-50 text-red-600 text-sm">
               {t('common.error')}: {error}
@@ -400,7 +400,7 @@ export function GroupListPage() {
         </div>
 
         {/* Lag Detail */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-4 min-h-0">
           {selectedGroup ? (
             <div>
               <div className="flex items-center justify-between mb-4">
