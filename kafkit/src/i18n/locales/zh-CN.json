@@ -420,5 +420,18 @@
     "csv": "CSV",
     "text": "纯文本",
     "binary": "二进制"
+  },
+  "search": {
+    "help": "搜索帮助",
+    "syntax": "搜索语法",
+    "basic": "基础搜索",
+    "filters": "字段过滤",
+    "examples": "示例",
+    "keywordDesc": "搜索所有字段",
+    "exactDesc": "精确匹配",
+    "excludeDesc": "排除词",
+    "keyFilter": "按 Key 过滤",
+    "offsetFilter": "Offset 大于",
+    "partitionFilter": "指定分区"
   }
 }

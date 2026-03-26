@@ -420,5 +420,18 @@
     "csv": "CSV",
     "text": "Text",
     "binary": "Binary"
+  },
+  "search": {
+    "help": "Search Help",
+    "syntax": "Search Syntax",
+    "basic": "Basic Search",
+    "filters": "Field Filters",
+    "examples": "Examples",
+    "keywordDesc": "Search in all fields",
+    "exactDesc": "Exact match",
+    "excludeDesc": "Exclude term",
+    "keyFilter": "Filter by key",
+    "offsetFilter": "Offset greater than",
+    "partitionFilter": "Specific partition"
   }
 }

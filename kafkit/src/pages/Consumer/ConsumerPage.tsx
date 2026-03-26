@@ -8,7 +8,9 @@ import type { KafkaMessage, TopicDetail, OffsetSpec } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { VirtualMessageList } from '../../components/VirtualMessageList';
 import { MemoryWarning } from '../../components/MemoryWarning';
+import { SearchHelp } from '../../components/SearchHelp';
 import { MEMORY_LIMIT_THRESHOLD } from '../../utils/errorHandler';
+import { parseSearchQuery, matchSearch } from '../../utils/search';
 
 // Tauri dialog API
 const getTauriDialog = async () => {
@@ -953,19 +955,37 @@ export function ConsumerPage() {
     setMessages([]);
   };
 
-  // 消息过滤逻辑
+  // 消息过滤逻辑 - 支持高级搜索语法
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return messages;
 
     const query = searchQuery.trim();
-    let regex: RegExp | null = null;
+    
+    // 检查是否使用高级搜索语法
+    const hasAdvancedSyntax = /:|"|^-/.test(query);
+    
+    if (hasAdvancedSyntax) {
+      // 使用高级搜索
+      const parsedQuery = parseSearchQuery(query);
+      return messages.filter(msg => {
+        const searchableMsg = {
+          ...msg,
+          key: msg.key || '',
+          value: msg.value || '',
+          offset: String(msg.offset),
+          partition: String(msg.partition),
+        };
+        return matchSearch(searchableMsg, parsedQuery, ['key', 'value', 'offset', 'partition']);
+      });
+    }
 
+    // 使用简单搜索
+    let regex: RegExp | null = null;
     if (useRegex) {
       try {
         const flags = caseSensitive ? '' : 'i';
         regex = new RegExp(query, flags);
       } catch (e) {
-        // 正则表达式无效，返回所有消息
         return messages;
       }
     }
@@ -1309,8 +1329,8 @@ export function ConsumerPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('consumer.searchPlaceholder') || 'Search in messages...'}
-                    className="w-full h-8 px-3 pl-9 text-sm border border-border rounded bg-background"
+                    placeholder={t('consumer.searchPlaceholder') || 'Search: keyword, field:value, "exact", -exclude...'}
+                    className="w-full h-8 px-3 pl-9 pr-20 text-sm border border-border rounded bg-background"
                   />
                   <svg
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
@@ -1320,14 +1340,17 @@ export function ConsumerPage() {
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      ×
-                    </button>
-                  )}
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <SearchHelp />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 <select
