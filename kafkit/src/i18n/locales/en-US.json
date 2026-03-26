@@ -412,5 +412,13 @@
     "goToConnections": "Manage Connections",
     "topicPartitions": "{count} partitions",
     "switchConnection": "Switch to this connection"
+  },
+  "schema": {
+    "avro": "Avro",
+    "protobuf": "Protobuf",
+    "json": "JSON",
+    "csv": "CSV",
+    "text": "Text",
+    "binary": "Binary"
   }
 }

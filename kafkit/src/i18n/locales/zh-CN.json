@@ -412,5 +412,13 @@
     "goToConnections": "管理连接",
     "topicPartitions": "{count} 个分区",
     "switchConnection": "切换到该连接"
+  },
+  "schema": {
+    "avro": "Avro",
+    "protobuf": "Protobuf",
+    "json": "JSON",
+    "csv": "CSV",
+    "text": "纯文本",
+    "binary": "二进制"
   }
 }

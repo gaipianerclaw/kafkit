@@ -2,6 +2,8 @@ import { useRef, useEffect, memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import type { KafkaMessage } from '../../types';
+import { detectAvroFormat, AvroParser } from '../../utils/schema/avro';
+import { detectProtobufFormat, ProtobufParser, parseProtobufFields } from '../../utils/schema/protobuf';
 import './styles.css';
 
 interface VirtualMessageListProps {
@@ -13,12 +15,22 @@ interface VirtualMessageListProps {
 }
 
 // 检测内容类型
-type ContentType = 'json' | 'csv' | 'text';
+type ContentType = 'json' | 'csv' | 'text' | 'avro' | 'protobuf';
 const detectContentType = (str: string): ContentType => {
+  // 先检测 Avro
+  if (detectAvroFormat(str) !== 'unknown') {
+    return 'avro';
+  }
+  // 再检测 Protobuf
+  if (detectProtobufFormat(str) !== 'unknown') {
+    return 'protobuf';
+  }
+  // 检测 JSON
   try {
     JSON.parse(str);
     return 'json';
   } catch {
+    // 检测 CSV
     if (str.includes(',') && str.split('\n').every(line => line.includes(','))) {
       return 'csv';
     }
@@ -148,6 +160,75 @@ const CsvRenderer = ({ data }: { data: string }) => {
   );
 };
 
+// Avro 渲染器
+const AvroRenderer = ({ data }: { data: string }) => {
+  const parsed = AvroParser.tryParseJson(data);
+  
+  if (!parsed) {
+    return (
+      <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
+        {data}
+      </pre>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-muted-foreground flex items-center gap-2">
+        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Avro</span>
+      </div>
+      <JsonRenderer data={parsed} />
+    </div>
+  );
+};
+
+// Protobuf 渲染器
+const ProtobufRenderer = ({ data }: { data: string }) => {
+  const parsed = ProtobufParser.tryParseJson(data);
+  
+  if (!parsed) {
+    // 尝试解析 base64
+    try {
+      const bytes = ProtobufParser.decodeBase64(data);
+      if (bytes.length > 0) {
+        const fields = parseProtobufFields(bytes);
+        return (
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Protobuf Binary</span>
+            </div>
+            <div className="text-xs font-mono">
+              {fields.map((f, i) => (
+                <div key={i} className="py-1 border-b border-border/30">
+                  <span className="text-muted-foreground">Field {f.field}:</span>
+                  <span className="ml-2">{typeof f.value === 'string' ? f.value : `[${f.type}]`}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+    } catch {
+      // 解析失败，显示原始数据
+    }
+    
+    return (
+      <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
+        {data}
+      </pre>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-muted-foreground flex items-center gap-2">
+        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Protobuf JSON</span>
+      </div>
+      <JsonRenderer data={parsed} />
+    </div>
+  );
+};
+
 // 单个消息行组件
 interface MessageRowProps {
   msg: KafkaMessage;
@@ -268,6 +349,8 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
             <div className="p-3 max-h-96 overflow-auto">
               {contentType === 'json' && <JsonRenderer data={displayValue} />}
               {contentType === 'csv' && <CsvRenderer data={msg.value} />}
+              {contentType === 'avro' && <AvroRenderer data={msg.value} />}
+              {contentType === 'protobuf' && <ProtobufRenderer data={msg.value} />}
               {contentType === 'text' && (
                 <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
                   {msg.value}
