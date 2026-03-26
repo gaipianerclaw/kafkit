@@ -1,9 +1,10 @@
 import { useRef, useEffect, memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronRight, Database } from 'lucide-react';
 import type { KafkaMessage } from '../../types';
 import { detectAvroFormat, AvroParser } from '../../utils/schema/avro';
 import { detectProtobufFormat, ProtobufParser, parseProtobufFields } from '../../utils/schema/protobuf';
+import { SchemaRegistryService, SchemaRegistryConfig, StoredSchema } from '../../services/schemaRegistry';
 import './styles.css';
 
 interface VirtualMessageListProps {
@@ -12,6 +13,79 @@ interface VirtualMessageListProps {
   isConsuming: boolean;
   autoScroll: boolean;
   onScrollStateChange: (isNearBottom: boolean) => void;
+}
+
+// Hook to load schema registries
+function useSchemaRegistries(): SchemaRegistryConfig | null {
+  const [config, setConfig] = useState<SchemaRegistryConfig | null>(null);
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('kafkit-schema-registries');
+    if (saved) {
+      try {
+        const registries = JSON.parse(saved);
+        // Use the first registry for now
+        if (registries.length > 0) {
+          setConfig(registries[0].config);
+        }
+      } catch {
+        console.error('Failed to parse schema registries');
+      }
+    }
+  }, []);
+  
+  return config;
+}
+
+// Hook to fetch schema from registry
+function useSchemaFromRegistry(schemaId: number | null, config: SchemaRegistryConfig | null) {
+  const [schema, setSchema] = useState<StoredSchema | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  useEffect(() => {
+    if (!schemaId || !config) {
+      setSchema(null);
+      return;
+    }
+    
+    setLoading(true);
+    const service = new SchemaRegistryService(config);
+    
+    service.getSchemaById(schemaId)
+      .then(setSchema)
+      .catch(err => {
+        console.error('Failed to fetch schema:', err);
+        setSchema(null);
+      })
+      .finally(() => setLoading(false));
+  }, [schemaId, config]);
+  
+  return { schema, loading };
+}
+
+// Extract Confluent schema ID from message (5-byte prefix: magic byte + 4-byte ID)
+function extractSchemaId(value: string): number | null {
+  // Try to detect if this is a Confluent wire format message
+  // Format: [magic byte (0)] [schema ID (4 bytes)] [data]
+  try {
+    // First check if it's base64 encoded binary
+    const binary = atob(value);
+    if (binary.length < 5) return null;
+    
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    
+    // Magic byte should be 0
+    if (bytes[0] !== 0) return null;
+    
+    // Read schema ID (big-endian)
+    const schemaId = (bytes[1] << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4];
+    return schemaId;
+  } catch {
+    return null;
+  }
 }
 
 // 检测内容类型
@@ -160,8 +234,8 @@ const CsvRenderer = ({ data }: { data: string }) => {
   );
 };
 
-// Avro 渲染器
-const AvroRenderer = ({ data }: { data: string }) => {
+// Avro 渲染器 with Schema Registry support
+const AvroRenderer = ({ data, schema }: { data: string; schema?: StoredSchema }) => {
   const parsed = AvroParser.tryParseJson(data);
   
   if (!parsed) {
@@ -176,14 +250,20 @@ const AvroRenderer = ({ data }: { data: string }) => {
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground flex items-center gap-2">
         <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Avro</span>
+        {schema && (
+          <span className="flex items-center gap-1">
+            <Database className="w-3 h-3" />
+            {schema.subject} v{schema.version}
+          </span>
+        )}
       </div>
       <JsonRenderer data={parsed} />
     </div>
   );
 };
 
-// Protobuf 渲染器
-const ProtobufRenderer = ({ data }: { data: string }) => {
+// Protobuf 渲染器 with Schema Registry support
+const ProtobufRenderer = ({ data, schema }: { data: string; schema?: StoredSchema }) => {
   const parsed = ProtobufParser.tryParseJson(data);
   
   if (!parsed) {
@@ -196,6 +276,12 @@ const ProtobufRenderer = ({ data }: { data: string }) => {
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Protobuf Binary</span>
+              {schema && (
+                <span className="flex items-center gap-1">
+                  <Database className="w-3 h-3" />
+                  {schema.subject} v{schema.version}
+                </span>
+              )}
             </div>
             <div className="text-xs font-mono">
               {fields.map((f, i) => (
@@ -223,6 +309,12 @@ const ProtobufRenderer = ({ data }: { data: string }) => {
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground flex items-center gap-2">
         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Protobuf JSON</span>
+        {schema && (
+          <span className="flex items-center gap-1">
+            <Database className="w-3 h-3" />
+            {schema.subject} v{schema.version}
+          </span>
+        )}
       </div>
       <JsonRenderer data={parsed} />
     </div>
@@ -238,6 +330,11 @@ interface MessageRowProps {
 const MessageRow = memo(({ msg, index }: MessageRowProps) => {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Schema Registry integration
+  const registryConfig = useSchemaRegistries();
+  const schemaId = extractSchemaId(msg.value);
+  const { schema } = useSchemaFromRegistry(schemaId, registryConfig);
   
   const contentType = detectContentType(msg.value);
   let displayValue: unknown = msg.value;
@@ -349,8 +446,8 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
             <div className="p-3 max-h-96 overflow-auto">
               {contentType === 'json' && <JsonRenderer data={displayValue} />}
               {contentType === 'csv' && <CsvRenderer data={msg.value} />}
-              {contentType === 'avro' && <AvroRenderer data={msg.value} />}
-              {contentType === 'protobuf' && <ProtobufRenderer data={msg.value} />}
+              {contentType === 'avro' && <AvroRenderer data={msg.value} schema={schema || undefined} />}
+              {contentType === 'protobuf' && <ProtobufRenderer data={msg.value} schema={schema || undefined} />}
               {contentType === 'text' && (
                 <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
                   {msg.value}

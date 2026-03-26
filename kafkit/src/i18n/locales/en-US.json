@@ -421,6 +421,26 @@
     "text": "Text",
     "binary": "Binary"
   },
+  "schemaRegistry": {
+    "title": "Schema Registry",
+    "add": "Add",
+    "noConfigs": "No Schema Registry configurations. Click Add to create one",
+    "schemas": "Schemas",
+    "subject": "Subject",
+    "type": "Type",
+    "versions": "Versions",
+    "latest": "Latest",
+    "addTitle": "Add Schema Registry",
+    "nameLabel": "Name",
+    "namePlaceholder": "My Schema Registry",
+    "urlLabel": "URL",
+    "usernameLabel": "Username (optional)",
+    "passwordLabel": "Password (optional)",
+    "testAndAdd": "Test and Add",
+    "connectionFailed": "Connection failed. Please check URL and credentials",
+    "fetchError": "Failed to fetch schemas",
+    "confirmDelete": "Are you sure you want to delete this configuration?"
+  },
   "search": {
     "help": "Search Help",
     "syntax": "Search Syntax",

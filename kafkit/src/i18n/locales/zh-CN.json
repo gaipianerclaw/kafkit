@@ -421,6 +421,26 @@
     "text": "纯文本",
     "binary": "二进制"
   },
+  "schemaRegistry": {
+    "title": "Schema Registry",
+    "add": "添加",
+    "noConfigs": "暂无 Schema Registry 配置，点击添加按钮创建",
+    "schemas": "Schemas",
+    "subject": "Subject",
+    "type": "类型",
+    "versions": "版本",
+    "latest": "最新",
+    "addTitle": "添加 Schema Registry",
+    "nameLabel": "名称",
+    "namePlaceholder": "我的 Schema Registry",
+    "urlLabel": "URL",
+    "usernameLabel": "用户名（可选）",
+    "passwordLabel": "密码（可选）",
+    "testAndAdd": "测试并添加",
+    "connectionFailed": "连接失败，请检查 URL 和认证信息",
+    "fetchError": "获取 Schema 失败",
+    "confirmDelete": "确定要删除此配置吗？"
+  },
   "search": {
     "help": "搜索帮助",
     "syntax": "搜索语法",

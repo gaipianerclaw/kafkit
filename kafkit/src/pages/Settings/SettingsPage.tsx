@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Globe, Moon, Sun, Monitor, Info } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { SchemaRegistryList } from '../../components/SchemaRegistryList';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -73,6 +74,11 @@ export function SettingsPage() {
           </div>
         </div>
 
+        {/* Schema Registry */}
+        <div className="bg-card border border-border rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
+          <SchemaRegistryList />
+        </div>
+
         {/* About */}
         <div className="bg-card border border-border rounded-lg p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -82,7 +88,7 @@ export function SettingsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('settings.version')}</span>
-              <span className="font-mono">1.0.2</span>
+              <span className="font-mono">1.0.3</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('settings.kafkaClient')}</span>

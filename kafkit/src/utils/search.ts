@@ -25,12 +25,13 @@ export function parseSearchQuery(query: string): SearchQuery {
   const filters: SearchFilter[] = [];
   
   // 正则匹配:
-  // 1. 过滤器: field:operator:value 或 field:value
+  // 1. 过滤器: field:operator:value 或 field:>value 或 field:value
   // 2. 排除项: -value
   // 3. 精确匹配: "value"
   // 4. 普通词: value
   
-  const filterRegex = /(\w+):(?:(eq|gt|lt|gte|lte|contains|regex|>|<|>=|<=):)?([^\s]+)/g;
+  // 匹配: field:value 或 field:operator:value 或 field:>value
+  const filterRegex = /(\w+):(?:(eq|gt|lt|gte|lte|contains|regex):)?(>=|<=|>|<)?([^\s]+)/g;
   const exactRegex = /"([^"]*)"/g;
   const negatedRegex = /-(\w+)/g;
   
@@ -39,34 +40,40 @@ export function parseSearchQuery(query: string): SearchQuery {
   // 提取过滤器
   let match;
   while ((match = filterRegex.exec(query)) !== null) {
-    const [, field, operator, value] = match;
+    const [, field, operatorFull, operatorShort, value] = match;
+    // operatorFull 来自完整格式 (eq, gt, lt 等)
+    // operatorShort 来自简写格式 (>, <, >=, <=)
+    // 如果都没有，默认是 eq
+    const operator = operatorFull || operatorShort || 'eq';
     filters.push({
       field: field.toLowerCase(),
-      operator: parseOperator(operator || 'eq'),
+      operator: parseOperator(operator),
       value: unescapeValue(value),
       negated: false,
     });
     remaining = remaining.replace(match[0], '');
   }
   
-  // 提取精确匹配
-  while ((match = exactRegex.exec(query)) !== null) {
+  // 提取精确匹配 (从 remaining 中提取，避免重复处理)
+  let exactMatch;
+  while ((exactMatch = exactRegex.exec(remaining)) !== null) {
     terms.push({
-      value: match[1],
+      value: exactMatch[1],
       negated: false,
       exact: true,
     });
-    remaining = remaining.replace(`"${match[1]}"`, '');
+    remaining = remaining.replace(`"${exactMatch[1]}"`, '');
   }
   
-  // 提取排除项
-  while ((match = negatedRegex.exec(query)) !== null) {
+  // 提取排除项 (从 remaining 中提取)
+  let negatedMatch;
+  while ((negatedMatch = negatedRegex.exec(remaining)) !== null) {
     terms.push({
-      value: match[1],
+      value: negatedMatch[1],
       negated: true,
       exact: false,
     });
-    remaining = remaining.replace(`-${match[1]}`, '');
+    remaining = remaining.replace(`-${negatedMatch[1]}`, '');
   }
   
   // 剩余的是普通词
