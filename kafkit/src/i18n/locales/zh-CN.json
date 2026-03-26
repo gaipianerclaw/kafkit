@@ -313,6 +313,7 @@
     "status": {
       "loading": "加载中...",
       "noData": "暂无消费进度数据",
+      "noDataHint": "可能原因：1. 消费组尚未开始消费 2. 消费组没有提交过 offset 3. 消费组已过期",
       "empty": "暂无 Consumer Group"
     },
     "errors": {

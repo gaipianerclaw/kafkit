@@ -282,13 +282,19 @@ export function GroupListPage() {
     if (!activeConnection) return;
     
     setLagLoading(true);
+    console.log(`[Kafkit] Fetching lag for group: ${groupId}`);
     try {
       const tauriService = await getService();
       const data = await tauriService.getConsumerLag(activeConnection, groupId);
+      console.log(`[Kafkit] Lag data received:`, data);
       // 确保 data 是数组
-      setLagData(Array.isArray(data) ? data : []);
+      const lagArray = Array.isArray(data) ? data : [];
+      setLagData(lagArray);
+      if (lagArray.length === 0) {
+        console.log('[Kafkit] No lag data found for group:', groupId);
+      }
     } catch (err) {
-      console.error('Failed to fetch lag:', err);
+      console.error('[Kafkit] Failed to fetch lag:', err);
       setLagData([]);
     } finally {
       setLagLoading(false);
@@ -419,7 +425,10 @@ export function GroupListPage() {
                 <div className="text-center py-8">{t('consumerGroups.status.loading')}</div>
               ) : !lagData || lagData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {t('consumerGroups.status.noData')}
+                  <p className="mb-2">{t('consumerGroups.status.noData')}</p>
+                  <p className="text-xs max-w-md mx-auto">
+                    {t('consumerGroups.status.noDataHint') || '可能原因：1. 消费组尚未开始消费 2. 消费组没有提交过 offset 3. 消费组已过期'}
+                  </p>
                 </div>
               ) : (
                 <div className="border border-border rounded-lg overflow-hidden">

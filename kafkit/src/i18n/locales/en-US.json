@@ -313,6 +313,7 @@
     "status": {
       "loading": "Loading...",
       "noData": "No consumption data",
+      "noDataHint": "Possible reasons: 1. Group has not started consuming 2. No offsets committed 3. Group expired",
       "empty": "No Consumer Groups"
     },
     "errors": {
