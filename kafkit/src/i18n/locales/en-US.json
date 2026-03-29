@@ -453,5 +453,66 @@
     "keyFilter": "Filter by key",
     "offsetFilter": "Offset greater than",
     "partitionFilter": "Specific partition"
+  },
+  "pagination": {
+    "showing": "Showing {start}-{end} of {total} items",
+    "perPage": "per page",
+    "items": "items",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page"
+  },
+  "monitor": {
+    "title": "Alert Center",
+    "status": {
+      "running": "Monitoring active",
+      "stopped": "Monitoring stopped"
+    },
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "acknowledged": "Acknowledged",
+      "resolved": "Resolved"
+    },
+    "empty": "No alerts",
+    "currentFilter": "Current filter",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "warning": "Warning",
+      "error": "Error",
+      "resolved": "Resolved"
+    },
+    "actions": {
+      "clearAll": "Clear All",
+      "settings": "Settings",
+      "acknowledge": "Acknowledge",
+      "dismiss": "Dismiss"
+    },
+    "alertItem": {
+      "status": "Status",
+      "severity": "Severity",
+      "time": "Time",
+      "resolved": "Resolved"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Error",
+      "critical": "Critical"
+    },
+    "types": {
+      "consumer_lag": "Consumer Lag",
+      "connection_lost": "Connection Lost",
+      "topic_growth": "Topic Growth",
+      "produce_error": "Produce Error",
+      "consume_error": "Consume Error"
+    }
+  },
+  "consumer": {
+    "alerts": {
+      "loadingTopicInfo": "Loading topic info, please try again later",
+      "topicInfoFailed": "Failed to load topic info, please refresh the page"
+    }
   }
 }

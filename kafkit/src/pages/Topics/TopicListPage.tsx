@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Search, Plus, Trash2, Eye, Send, Download, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Pagination } from '../../components/Pagination';
 import { useConnectionStore } from '../../stores';
 import type { TopicInfo } from '../../types';
 import { useTranslation } from 'react-i18next';
@@ -203,6 +204,11 @@ export function TopicListPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const lastFetchedConnectionRef = useRef<string | null>(null);
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [paginatedTopics, setPaginatedTopics] = useState<TopicInfo[]>([]);
 
   useEffect(() => {
     // 只在 activeConnection 变化时才重新获取，返回时不刷新
@@ -226,14 +232,26 @@ export function TopicListPage() {
   }, [activeConnection]);
 
   useEffect(() => {
+    let result = topics;
+    
+    // 搜索过滤
     if (searchQuery) {
-      setFilteredTopics(topics.filter(t => 
+      result = topics.filter(t => 
         t.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ));
-    } else {
-      setFilteredTopics(topics);
+      );
     }
+    
+    setFilteredTopics(result);
+    // 重置到第一页
+    setCurrentPage(1);
   }, [searchQuery, topics]);
+  
+  // 分页计算
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    setPaginatedTopics(filteredTopics.slice(startIndex, endIndex));
+  }, [filteredTopics, currentPage, pageSize]);
 
   const fetchTopics = async () => {
     if (!activeConnection) return;
@@ -373,7 +391,7 @@ export function TopicListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredTopics.map(topic => (
+                {paginatedTopics.map(topic => (
                   <tr key={topic.name} className="hover:bg-muted/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center">
@@ -430,6 +448,18 @@ export function TopicListPage() {
                 ))}
               </tbody>
             </table>
+            
+            {/* Pagination */}
+            {filteredTopics.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredTopics.length / pageSize)}
+                totalItems={filteredTopics.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
           </div>
         ) : null}
 

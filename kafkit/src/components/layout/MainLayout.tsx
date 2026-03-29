@@ -12,6 +12,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import { QuickSearch } from '../QuickSearch';
+import { AlertCenter } from '../AlertCenter';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export function MainLayout() {
@@ -162,7 +163,13 @@ export function MainLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Outlet />
+        {/* Header Toolbar */}
+        <div className="h-12 border-b border-border flex items-center justify-end px-4 gap-2">
+          <AlertCenter />
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <Outlet />
+        </div>
       </main>
       
       {/* 快捷键帮助 */}

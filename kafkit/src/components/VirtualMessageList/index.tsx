@@ -1,6 +1,8 @@
-import { useRef, useEffect, memo, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, Check, ChevronDown, ChevronRight, Database } from 'lucide-react';
+import { List, useListRef, useDynamicRowHeight } from 'react-window';
+import { Copy, Check, ChevronDown, Database } from 'lucide-react';
 import type { KafkaMessage } from '../../types';
 import { detectAvroFormat, AvroParser } from '../../utils/schema/avro';
 import { detectProtobufFormat, ProtobufParser, parseProtobufFields } from '../../utils/schema/protobuf';
@@ -15,6 +17,10 @@ interface VirtualMessageListProps {
   onScrollStateChange: (isNearBottom: boolean) => void;
 }
 
+// 默认行高
+const ROW_HEIGHT_COLLAPSED = 48;
+const ROW_HEIGHT_EXPANDED = 350;
+
 // Hook to load schema registries
 function useSchemaRegistries(): SchemaRegistryConfig | null {
   const [config, setConfig] = useState<SchemaRegistryConfig | null>(null);
@@ -24,7 +30,6 @@ function useSchemaRegistries(): SchemaRegistryConfig | null {
     if (saved) {
       try {
         const registries = JSON.parse(saved);
-        // Use the first registry for now
         if (registries.length > 0) {
           setConfig(registries[0].config);
         }
@@ -63,12 +68,9 @@ function useSchemaFromRegistry(schemaId: number | null, config: SchemaRegistryCo
   return { schema, loading };
 }
 
-// Extract Confluent schema ID from message (5-byte prefix: magic byte + 4-byte ID)
+// Extract Confluent schema ID from message
 function extractSchemaId(value: string): number | null {
-  // Try to detect if this is a Confluent wire format message
-  // Format: [magic byte (0)] [schema ID (4 bytes)] [data]
   try {
-    // First check if it's base64 encoded binary
     const binary = atob(value);
     if (binary.length < 5) return null;
     
@@ -77,10 +79,8 @@ function extractSchemaId(value: string): number | null {
       bytes[i] = binary.charCodeAt(i);
     }
     
-    // Magic byte should be 0
     if (bytes[0] !== 0) return null;
     
-    // Read schema ID (big-endian)
     const schemaId = (bytes[1] << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4];
     return schemaId;
   } catch {
@@ -91,20 +91,12 @@ function extractSchemaId(value: string): number | null {
 // 检测内容类型
 type ContentType = 'json' | 'csv' | 'text' | 'avro' | 'protobuf';
 const detectContentType = (str: string): ContentType => {
-  // 先检测 Avro
-  if (detectAvroFormat(str) !== 'unknown') {
-    return 'avro';
-  }
-  // 再检测 Protobuf
-  if (detectProtobufFormat(str) !== 'unknown') {
-    return 'protobuf';
-  }
-  // 检测 JSON
+  if (detectAvroFormat(str) !== 'unknown') return 'avro';
+  if (detectProtobufFormat(str) !== 'unknown') return 'protobuf';
   try {
     JSON.parse(str);
     return 'json';
   } catch {
-    // 检测 CSV
     if (str.includes(',') && str.split('\n').every(line => line.includes(','))) {
       return 'csv';
     }
@@ -112,15 +104,55 @@ const detectContentType = (str: string): ContentType => {
   }
 };
 
-// JSON 渲染器
+// 格式化时间戳
+const formatShortTimestamp = (ts?: number): string => {
+  if (!ts) return '-';
+  const date = new Date(ts);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+};
+
+// JSON 渲染器 with syntax highlighting and truncation
 const JsonRenderer = ({ data }: { data: unknown }) => {
-  const renderValue = (value: unknown, level: number = 0): JSX.Element => {
+  const [expandedStrings, setExpandedStrings] = useState<Set<string>>(new Set());
+  
+  const toggleStringExpand = (key: string) => {
+    setExpandedStrings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+  
+  const renderValue = (value: unknown, level: number = 0, key?: string): React.ReactNode => {
     const indent = level * 12;
+    const stringKey = key || `${level}`;
     
     if (value === null) return <span className="text-gray-500">null</span>;
     if (typeof value === 'boolean') return <span className="text-orange-600">{String(value)}</span>;
     if (typeof value === 'number') return <span className="text-blue-600">{value}</span>;
-    if (typeof value === 'string') return <span className="text-green-600">&quot;{value}&quot;</span>;
+    if (typeof value === 'string') {
+      const isExpanded = expandedStrings.has(stringKey);
+      const isLong = value.length > 200;
+      const displayValue = isLong && !isExpanded ? value.slice(0, 200) + '...' : value;
+      
+      return (
+        <span className="text-green-600">
+          &quot;{displayValue}&quot;
+          {isLong && (
+            <button
+              onClick={() => toggleStringExpand(stringKey)}
+              className="ml-1 text-xs text-blue-500 hover:text-blue-700 underline"
+            >
+              {isExpanded ? '收起' : '展开'}
+            </button>
+          )}
+        </span>
+      );
+    }
     
     if (Array.isArray(value)) {
       if (value.length === 0) return <span>[]</span>;
@@ -129,7 +161,7 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
           <span>[</span>
           {value.map((item, idx) => (
             <div key={idx} style={{ marginLeft: 12 }}>
-              {renderValue(item, level + 1)}
+              {renderValue(item, level + 1, `${stringKey}[${idx}]`)}
               {idx < value.length - 1 && <span>,</span>}
             </div>
           ))}
@@ -144,11 +176,11 @@ const JsonRenderer = ({ data }: { data: unknown }) => {
       return (
         <div style={{ marginLeft: indent }}>
           <span>{'{'}</span>
-          {entries.map(([key, val], idx) => (
-            <div key={key} style={{ marginLeft: 12 }}>
-              <span className="text-purple-600">&quot;{key}&quot;</span>
+          {entries.map(([k, val], idx) => (
+            <div key={k} style={{ marginLeft: 12 }}>
+              <span className="text-purple-600">&quot;{k}&quot;</span>
               <span>: </span>
-              {renderValue(val, level + 1)}
+              {renderValue(val, level + 1, `${stringKey}.${k}`)}
               {idx < entries.length - 1 && <span>,</span>}
             </div>
           ))}
@@ -217,9 +249,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
           {rows.slice(0, 20).map((row, rowIdx) => (
             <tr key={rowIdx} className="border-b border-border/50">
               {row.map((cell, cellIdx) => (
-                <td key={cellIdx} className="py-1 px-2 font-mono">
-                  {cell}
-                </td>
+                <td key={cellIdx} className="py-1 px-2 font-mono">{cell}</td>
               ))}
             </tr>
           ))}
@@ -234,16 +264,12 @@ const CsvRenderer = ({ data }: { data: string }) => {
   );
 };
 
-// Avro 渲染器 with Schema Registry support
+// Avro 渲染器
 const AvroRenderer = ({ data, schema }: { data: string; schema?: StoredSchema }) => {
   const parsed = AvroParser.tryParseJson(data);
   
   if (!parsed) {
-    return (
-      <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
-        {data}
-      </pre>
-    );
+    return <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">{data}</pre>;
   }
 
   return (
@@ -262,12 +288,11 @@ const AvroRenderer = ({ data, schema }: { data: string; schema?: StoredSchema })
   );
 };
 
-// Protobuf 渲染器 with Schema Registry support
+// Protobuf 渲染器
 const ProtobufRenderer = ({ data, schema }: { data: string; schema?: StoredSchema }) => {
   const parsed = ProtobufParser.tryParseJson(data);
   
   if (!parsed) {
-    // 尝试解析 base64
     try {
       const bytes = ProtobufParser.decodeBase64(data);
       if (bytes.length > 0) {
@@ -295,14 +320,10 @@ const ProtobufRenderer = ({ data, schema }: { data: string; schema?: StoredSchem
         );
       }
     } catch {
-      // 解析失败，显示原始数据
+      // 解析失败
     }
     
-    return (
-      <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
-        {data}
-      </pre>
-    );
+    return <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">{data}</pre>;
   }
 
   return (
@@ -321,18 +342,26 @@ const ProtobufRenderer = ({ data, schema }: { data: string; schema?: StoredSchem
   );
 };
 
-// 单个消息行组件
-interface MessageRowProps {
-  msg: KafkaMessage;
-  index: number;
+// 列表项数据类型
+interface ListItemData {
+  messages: KafkaMessage[];
+  allMessages: KafkaMessage[];
+  expandedRows: Set<number>;
+  toggleExpanded: (index: number) => void;
+  registryConfig: SchemaRegistryConfig | null;
+  dynamicRowHeight: ReturnType<typeof useDynamicRowHeight>;
 }
 
-const MessageRow = memo(({ msg, index }: MessageRowProps) => {
-  const [expanded, setExpanded] = useState(false);
+// 行渲染组件
+const MessageRow: FC<any> = ({ index, style, data }) => {
+  const { messages, allMessages, expandedRows, toggleExpanded, registryConfig, dynamicRowHeight } = data as ListItemData;
+  const msg = messages[index];
+  const originalIndex = allMessages.indexOf(msg);
+  const isExpanded = expandedRows.has(index);
   const [copied, setCopied] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   
-  // Schema Registry integration
-  const registryConfig = useSchemaRegistries();
+  // Schema Registry
   const schemaId = extractSchemaId(msg.value);
   const { schema } = useSchemaFromRegistry(schemaId, registryConfig);
   
@@ -354,7 +383,8 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
     value: displayValue
   };
   
-  const copyFullJson = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(JSON.stringify(messageJson, null, 2));
       setCopied(true);
@@ -363,65 +393,76 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
       console.error('Failed to copy:', err);
     }
   };
-
-  const getValuePreview = () => {
-    const str = typeof displayValue === 'object' 
-      ? JSON.stringify(displayValue)
-      : String(displayValue);
-    if (str.length <= 80) return str;
-    return str.slice(0, 80) + '...';
-  };
-
-  const formatShortTimestamp = (ts?: number) => {
-    if (!ts) return '-';
-    const date = new Date(ts);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
-
+  
+  const previewValue = typeof displayValue === 'object' 
+    ? JSON.stringify(displayValue)
+    : String(displayValue);
+  
+  // 使用 ResizeObserver 测量实际行高
+  useEffect(() => {
+    if (!rowRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        // 确保最小高度
+        const finalHeight = Math.max(height, isExpanded ? ROW_HEIGHT_EXPANDED : ROW_HEIGHT_COLLAPSED);
+        dynamicRowHeight.setRowHeight(index, finalHeight);
+      }
+    });
+    
+    observer.observe(rowRef.current);
+    
+    // 初始设置
+    const initialHeight = isExpanded ? ROW_HEIGHT_EXPANDED : ROW_HEIGHT_COLLAPSED;
+    dynamicRowHeight.setRowHeight(index, initialHeight);
+    
+    return () => observer.disconnect();
+  }, [index, isExpanded, dynamicRowHeight]);
+  
   return (
-    <div className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors">
-      {/* 表头行 - 可点击展开 */}
+    <div ref={rowRef} style={style} className="border-b border-border last:border-b-0 bg-white hover:bg-muted/20">
+      {/* 表头行 */}
       <div 
         className="grid grid-cols-[2rem_3rem_4rem_6rem_7rem_8rem_1fr_2.5rem] gap-2 px-3 py-2 cursor-pointer select-none items-center"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => toggleExpanded(index)}
       >
-        <button className="text-muted-foreground hover:text-foreground transition-colors justify-self-center">
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        <button 
+          className={`
+            w-6 h-6 rounded-full flex items-center justify-center
+            transition-all duration-200 ease-in-out
+            ${isExpanded 
+              ? 'bg-primary/10 text-primary rotate-0' 
+              : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20 hover:text-foreground -rotate-90'
+            }
+            hover:scale-110 active:scale-95
+            shadow-sm hover:shadow
+          `}
+          title={isExpanded ? '收起' : '展开'}
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
         </button>
         
-        <span className="text-xs text-muted-foreground">#{index + 1}</span>
+        <span className="text-xs text-muted-foreground">#{originalIndex + 1}</span>
         
         <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium text-center">
           P{msg.partition}
         </span>
         
-        <span className="text-xs text-muted-foreground font-mono">
-          {msg.offset.toLocaleString()}
-        </span>
+        <span className="text-xs text-muted-foreground font-mono">{msg.offset.toLocaleString()}</span>
         
-        <span className="text-xs text-muted-foreground">
-          {formatShortTimestamp(msg.timestamp)}
-        </span>
+        <span className="text-xs text-muted-foreground">{formatShortTimestamp(msg.timestamp)}</span>
         
         <span className="text-xs text-purple-600 font-mono truncate">
           {msg.key ? (msg.key.length > 12 ? msg.key.slice(0, 12) + '...' : msg.key) : '-'}
         </span>
         
         <span className="text-xs text-muted-foreground truncate font-mono">
-          {getValuePreview()}
+          {previewValue.length > 80 ? previewValue.slice(0, 80) + '...' : previewValue}
         </span>
         
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            copyFullJson();
-          }}
+          onClick={handleCopy}
           className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground justify-self-center"
           title="Copy JSON"
         >
@@ -429,8 +470,8 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
         </button>
       </div>
       
-      {/* 展开后的详细内容 */}
-      {expanded && (
+      {/* 展开内容 */}
+      {isExpanded && (
         <div className="px-3 pb-3 pl-12">
           <div className="bg-muted/30 rounded border border-border">
             {/* 元信息 */}
@@ -442,16 +483,14 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
               <span><span className="text-muted-foreground">Size:</span> <span className="font-mono">{((msg.size || 0) / 1024).toFixed(2)} KB</span></span>
               <span><span className="text-muted-foreground">Type:</span> <span className="font-mono uppercase">{contentType}</span></span>
             </div>
-            {/* Value 内容 */}
-            <div className="p-3 max-h-96 overflow-auto">
+            {/* Value 内容 - 固定高度可滚动区域 */}
+            <div className="p-3 h-64 overflow-auto">
               {contentType === 'json' && <JsonRenderer data={displayValue} />}
               {contentType === 'csv' && <CsvRenderer data={msg.value} />}
               {contentType === 'avro' && <AvroRenderer data={msg.value} schema={schema || undefined} />}
               {contentType === 'protobuf' && <ProtobufRenderer data={msg.value} schema={schema || undefined} />}
               {contentType === 'text' && (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">
-                  {msg.value}
-                </pre>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all text-foreground">{msg.value}</pre>
               )}
             </div>
           </div>
@@ -459,37 +498,93 @@ const MessageRow = memo(({ msg, index }: MessageRowProps) => {
       )}
     </div>
   );
-});
+};
 
-MessageRow.displayName = 'MessageRow';
-
-// 虚拟列表组件
-export const VirtualMessageList = memo(({
+// 主虚拟列表组件
+export const VirtualMessageList: FC<VirtualMessageListProps> = ({
   messages,
   filteredMessages,
   isConsuming,
   autoScroll,
   onScrollStateChange,
-}: VirtualMessageListProps) => {
+}) => {
   const { t } = useTranslation();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const listRef = useListRef();
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const prevLengthRef = useRef(filteredMessages.length);
+  
+  // 使用动态行高 hook
+  const dynamicRowHeight = useDynamicRowHeight({
+    defaultRowHeight: ROW_HEIGHT_COLLAPSED,
+  });
+  
+  // Schema Registry config
+  const registryConfig = useSchemaRegistries();
+  
+  // 切换展开状态 - 同时更新行高
+  const toggleExpanded = useCallback((index: number) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      
+      if (newSet.has(index)) {
+        newSet.delete(index);
+        dynamicRowHeight.setRowHeight(index, ROW_HEIGHT_COLLAPSED);
+      } else {
+        newSet.add(index);
+        dynamicRowHeight.setRowHeight(index, ROW_HEIGHT_EXPANDED);
+      }
+      
+      return newSet;
+    });
+  }, [dynamicRowHeight]);
+  
+  // 当 filteredMessages 变化时，重置所有行高
+  useEffect(() => {
+    // 清理已不存在行的展开状态
+    setExpandedRows(prev => {
+      const newSet = new Set<number>();
+      prev.forEach(idx => {
+        if (idx < filteredMessages.length) {
+          newSet.add(idx);
+        }
+      });
+      return newSet;
+    });
+    
+    // 重新计算所有行高
+    for (let i = 0; i < filteredMessages.length; i++) {
+      const isExpanded = expandedRows.has(i);
+      dynamicRowHeight.setRowHeight(i, isExpanded ? ROW_HEIGHT_EXPANDED : ROW_HEIGHT_COLLAPSED);
+    }
+  }, [filteredMessages.length, dynamicRowHeight]);
+  
   // 自动滚动
   useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && listRef.current && filteredMessages.length > prevLengthRef.current) {
+      listRef.current.scrollToRow({ index: filteredMessages.length - 1, align: 'end' });
     }
-  }, [filteredMessages.length, autoScroll]);
-
+    prevLengthRef.current = filteredMessages.length;
+  }, [filteredMessages.length, autoScroll, listRef]);
+  
   // 处理滚动
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const element = listRef.current?.element;
+    if (!element) return;
+    const { scrollTop, scrollHeight, clientHeight } = element;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
     onScrollStateChange(isNearBottom);
-  }, [onScrollStateChange]);
-
+  }, [onScrollStateChange, listRef]);
+  
+  // 列表项数据
+  const itemData = useMemo<ListItemData>(() => ({
+    messages: filteredMessages,
+    allMessages: messages,
+    expandedRows,
+    toggleExpanded,
+    registryConfig,
+    dynamicRowHeight,
+  }), [filteredMessages, messages, expandedRows, toggleExpanded, registryConfig, dynamicRowHeight]);
+  
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -497,7 +592,7 @@ export const VirtualMessageList = memo(({
       </div>
     );
   }
-
+  
   if (filteredMessages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -505,23 +600,19 @@ export const VirtualMessageList = memo(({
       </div>
     );
   }
-
+  
   return (
     <div className="flex-1 min-h-0 relative">
-      <div 
-        ref={scrollRef}
-        className="h-full overflow-y-auto scrollbar-thin"
+      <List
+        listRef={listRef as any}
+        defaultHeight={600}
+        rowCount={filteredMessages.length}
+        rowHeight={dynamicRowHeight}
+        rowProps={{ data: itemData } as any}
+        rowComponent={MessageRow as any}
+        className="scrollbar-thin"
         onScroll={handleScroll}
-      >
-        {filteredMessages.map((msg, idx) => (
-          <MessageRow
-            key={`${msg.partition}-${msg.offset}-${idx}`}
-            msg={msg}
-            index={messages.indexOf(msg)}
-          />
-        ))}
-        <div ref={messagesEndRef} className="h-4" />
-      </div>
+      />
       
       {/* 消息计数器 */}
       <div className="absolute bottom-2 right-2 bg-background/90 border border-border rounded px-2 py-1 text-xs text-muted-foreground shadow z-10">
@@ -529,6 +620,4 @@ export const VirtualMessageList = memo(({
       </div>
     </div>
   );
-});
-
-VirtualMessageList.displayName = 'VirtualMessageList';
+};

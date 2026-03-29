@@ -453,5 +453,66 @@
     "keyFilter": "按 Key 过滤",
     "offsetFilter": "Offset 大于",
     "partitionFilter": "指定分区"
+  },
+  "pagination": {
+    "showing": "显示 {start}-{end} 条，共 {total} 条",
+    "perPage": "每页",
+    "items": "条",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "页"
+  },
+  "monitor": {
+    "title": "告警中心",
+    "status": {
+      "running": "监控运行中",
+      "stopped": "监控已停止"
+    },
+    "filters": {
+      "all": "全部",
+      "active": "未处理",
+      "acknowledged": "已确认",
+      "resolved": "已恢复"
+    },
+    "empty": "暂无告警",
+    "currentFilter": "当前筛选",
+    "stats": {
+      "total": "总计",
+      "active": "活跃",
+      "warning": "警告",
+      "error": "错误",
+      "resolved": "已恢复"
+    },
+    "actions": {
+      "clearAll": "清除全部",
+      "settings": "设置",
+      "acknowledge": "确认",
+      "dismiss": "忽略"
+    },
+    "alertItem": {
+      "status": "状态",
+      "severity": "级别",
+      "time": "时间",
+      "resolved": "已恢复"
+    },
+    "severity": {
+      "info": "信息",
+      "warning": "警告",
+      "error": "错误",
+      "critical": "严重"
+    },
+    "types": {
+      "consumer_lag": "消费延迟",
+      "connection_lost": "连接断开",
+      "topic_growth": "Topic 增长",
+      "produce_error": "生产错误",
+      "consume_error": "消费错误"
+    }
+  },
+  "consumer": {
+    "alerts": {
+      "loadingTopicInfo": "正在加载 Topic 信息，请稍后再试",
+      "topicInfoFailed": "Topic 信息加载失败，请刷新页面重试"
+    }
   }
 }

@@ -619,9 +619,11 @@ export function ConsumerPage() {
   
   const [messages, setMessages] = useState<KafkaMessage[]>([]);
   const [isConsuming, setIsConsuming] = useState(false);
+  const [memoryWarningDismissed, setMemoryWarningDismissed] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [selectedPartition, setSelectedPartition] = useState<string>('all');
   const [detail, setDetail] = useState<TopicDetail | null>(null);
+  const [isLoadingTopicInfo, setIsLoadingTopicInfo] = useState(true);
   const [topics, setTopics] = useState<{ name: string; partitionCount: number }[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
@@ -669,6 +671,9 @@ export function ConsumerPage() {
 
   useEffect(() => {
     if (activeConnection && topic) {
+      // 切换 topic 时重置加载状态
+      setIsLoadingTopicInfo(true);
+      setDetail(null);
       fetchTopicDetail();
       fetchTopics();
     }
@@ -703,12 +708,16 @@ export function ConsumerPage() {
 
   const fetchTopicDetail = async () => {
     if (!activeConnection || !topic) return;
+    setIsLoadingTopicInfo(true);
     try {
       const tauriService = await getService();
       const data = await tauriService.getTopicDetail(activeConnection, decodedTopic);
       setDetail(data);
     } catch (err) {
       console.error('Failed to fetch topic detail:', err);
+      setDetail(null);
+    } finally {
+      setIsLoadingTopicInfo(false);
     }
   };
 
@@ -725,6 +734,11 @@ export function ConsumerPage() {
 
   const handleNewMessage = useCallback((newMsg: KafkaMessage) => {
     setMessages(prev => {
+      // 当消息数量达到关键阈值时，重置警告关闭状态
+      if (prev.length === 5000 || prev.length === 10000) {
+        setMemoryWarningDismissed(false);
+      }
+      
       // 内存限制检查 - 超过阈值时清理早期消息
       if (prev.length >= MEMORY_LIMIT_THRESHOLD) {
         console.warn(`[Kafkit] Message count reached limit (${MEMORY_LIMIT_THRESHOLD}), cleaning up old messages`);
@@ -863,6 +877,17 @@ export function ConsumerPage() {
 
   const startConsumption = async () => {
     if (!activeConnection || !topic) return;
+    
+    // 检查 topic 信息是否加载完成
+    if (isLoadingTopicInfo) {
+      alert(t('consumer.alerts.loadingTopicInfo') || '正在加载 Topic 信息，请稍后再试');
+      return;
+    }
+    
+    if (!detail) {
+      alert(t('consumer.alerts.topicInfoFailed') || 'Topic 信息加载失败，请刷新页面重试');
+      return;
+    }
 
     try {
       // 先设置事件监听，避免错过早期消息
@@ -953,6 +978,7 @@ export function ConsumerPage() {
 
   const clearMessages = () => {
     setMessages([]);
+    setMemoryWarningDismissed(false);
   };
 
   // 消息过滤逻辑 - 支持高级搜索语法
@@ -1309,9 +1335,23 @@ export function ConsumerPage() {
               {t('consumer.stop')}
             </Button>
           ) : (
-            <Button size="sm" onClick={startConsumption}>
-              <Play className="w-4 h-4 mr-1" />
-              {consumerConfig.mode === 'file' ? t('consumer.config.mode.file') : t('consumer.start')}
+            <Button 
+              size="sm" 
+              onClick={startConsumption}
+              disabled={isLoadingTopicInfo || !detail}
+              title={isLoadingTopicInfo ? (t('consumer.alerts.loadingTopicInfo') || '正在加载 Topic 信息') : ''}
+            >
+              {isLoadingTopicInfo ? (
+                <>
+                  <div className="w-4 h-4 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  {t('common.loading') || '加载中...'}
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-1" />
+                  {consumerConfig.mode === 'file' ? t('consumer.config.mode.file') : t('consumer.start')}
+                </>
+              )}
             </Button>
           )}
         </div>
@@ -1393,12 +1433,12 @@ export function ConsumerPage() {
           )}
 
           {/* Memory Warning */}
-          {messages.length > 5000 && (
+          {messages.length > 5000 && !memoryWarningDismissed && (
             <div className="flex-shrink-0">
               <MemoryWarning
                 messageCount={messages.length}
-                onExport={exportMessages}
-                onDismiss={() => {}}
+                onExport={() => exportMessages('json')}
+                onDismiss={() => setMemoryWarningDismissed(true)}
               />
             </div>
           )}

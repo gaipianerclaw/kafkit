@@ -1,41 +1,101 @@
-/* Virtual Message List Styles */
+/* VirtualMessageList Styles */
 
-/* Custom scrollbar */
+/* react-window 列表容器 */
+.react-window-list {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* 自定义滚动条 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: hsl(var(--muted) / 0.3);
-  border-radius: 4px;
+  background: transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 4px;
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.5);
+  background-color: rgba(156, 163, 175, 0.8);
 }
 
-/* Firefox scrollbar */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted) / 0.3);
+/* 消息行样式 */
+.message-row {
+  transition: background-color 0.15s ease;
 }
 
-/* Ensure proper scrolling */
-.overflow-auto {
-  overflow: auto;
+.message-row:hover {
+  background-color: rgba(0, 0, 0, 0.02);
 }
 
-.min-h-0 {
-  min-height: 0;
+/* 展开内容动画 */
+.message-expanded {
+  animation: slideDown 0.2s ease-out;
 }
 
-/* Message row hover effect */
-.virtual-message-row:hover {
-  background-color: hsl(var(--muted) / 0.2);
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* JSON 语法高亮 */
+.json-key {
+  color: #9333ea;
+}
+
+.json-string {
+  color: #16a34a;
+}
+
+.json-number {
+  color: #2563eb;
+}
+
+.json-boolean {
+  color: #ea580c;
+}
+
+.json-null {
+  color: #6b7280;
+}
+
+/* 代码块样式 */
+pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* 表格样式覆盖 */
+.message-table th,
+.message-table td {
+  border: none;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 11px;
+}
+
+.message-table th {
+  background-color: rgba(0, 0, 0, 0.03);
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.message-table tr:last-child td {
+  border-bottom: none;
 }
