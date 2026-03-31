@@ -363,9 +363,11 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
                 <div>
                   <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Value:</span>
                   <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
-                    {typeof msg.value === 'object' 
-                      ? JSON.stringify(msg.value, null, 2) 
-                      : msg.value}
+                    {msg.value !== undefined && msg.value !== null
+                      ? (typeof msg.value === 'object' 
+                          ? JSON.stringify(msg.value, null, 2) 
+                          : String(msg.value))
+                      : JSON.stringify(msg, null, 2)}
                   </pre>
                 </div>
                 {msg.headers && Object.keys(msg.headers).length > 0 && (

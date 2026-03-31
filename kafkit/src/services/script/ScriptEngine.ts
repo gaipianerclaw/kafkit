@@ -197,15 +197,12 @@ export class ScriptEngine {
           return arr;
         } else {
           lengthHandle.dispose();
-          // Object
+          // Object - only extract defined properties
           const obj: Record<string, any> = {};
-          const props = ['key', 'value', 'headers', 'symbol', 'timestamp', 'price', 
-            'change', 'changePercent', 'volume', 'dayHigh', 'dayLow', 'dayOpen', 
-            'deviceId', 'readings', 'temperature', 'humidity', 'pressure', 'status', 
-            'orderId', 'customer', 'items', 'amount', 'currency', 'level', 'service', 
-            'message', 'traceId', 'event', 'userId', 'sessionId', 'properties', 'geo'];
           
-          for (const prop of props) {
+          // First try to get 'key', 'value', 'headers' which are the standard ScriptMessage fields
+          const standardProps = ['key', 'value', 'headers'];
+          for (const prop of standardProps) {
             try {
               const val = ctx.getProp(handle, prop);
               if (ctx.typeof(val) !== 'undefined') {
@@ -214,6 +211,26 @@ export class ScriptEngine {
               val.dispose();
             } catch { /* ignore */ }
           }
+          
+          // If 'value' is not found, this might be a plain object, extract all enumerable properties
+          if (!('value' in obj)) {
+            // Try common value property names
+            const valueProps = ['symbol', 'timestamp', 'price', 'change', 'changePercent', 
+              'volume', 'deviceId', 'readings', 'temperature', 'humidity', 'pressure', 
+              'status', 'orderId', 'customer', 'items', 'amount', 'currency', 'level', 
+              'service', 'message', 'traceId', 'event', 'userId', 'sessionId', 'action'];
+            
+            for (const prop of valueProps) {
+              try {
+                const val = ctx.getProp(handle, prop);
+                if (ctx.typeof(val) !== 'undefined') {
+                  obj[prop] = this.toJSObject(ctx, val);
+                }
+                val.dispose();
+              } catch { /* ignore */ }
+            }
+          }
+          
           return obj;
         }
       }
