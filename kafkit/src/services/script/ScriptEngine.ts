@@ -2,39 +2,79 @@
  * Script Engine Service - QuickJS Integration
  * 
  * Provides secure JavaScript execution environment for message generation
- * Uses local WASM files for offline support
  */
 
 import { getQuickJS } from 'quickjs-emscripten';
-import type { QuickJSWASMModule, QuickJSRuntime, QuickJSContext } from 'quickjs-emscripten-core';
+import type { QuickJSRuntime, QuickJSContext } from 'quickjs-emscripten-core';
 import type { ScriptContext, ScriptMessage } from '../../types/script';
 import { v4 as uuidv4 } from 'uuid';
 
+// Simple hash function for ctx.hash()
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16);
+}
+
+// Faker data generators
+const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth'];
+const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'example.com', 'company.com'];
+const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego'];
+const companies = ['Acme Corp', 'Globex', 'Initech', 'Hooli', 'Umbrella Corp', 'Stark Industries', 'Wayne Enterprises'];
+const loremWords = ['lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit', 'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore'];
+
+const fakerAPI = {
+  name: () => `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`,
+  email: () => {
+    const first = firstNames[Math.floor(Math.random() * firstNames.length)].toLowerCase();
+    const last = lastNames[Math.floor(Math.random() * lastNames.length)].toLowerCase();
+    return `${first}.${last}@${domains[Math.floor(Math.random() * domains.length)]}`;
+  },
+  phone: () => `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+  address: () => {
+    const num = Math.floor(Math.random() * 9000) + 1000;
+    const street = ['Main St', 'Oak Ave', 'Park Rd', 'Cedar Ln', 'Elm St'][Math.floor(Math.random() * 5)];
+    return `${num} ${street}, ${cities[Math.floor(Math.random() * cities.length)]}`;
+  },
+  company: () => companies[Math.floor(Math.random() * companies.length)],
+  lorem: (count: number) => {
+    const result: string[] = [];
+    for (let i = 0; i < count; i++) {
+      result.push(loremWords[Math.floor(Math.random() * loremWords.length)]);
+    }
+    return result.join(' ');
+  }
+};
+
 export class ScriptEngine {
-  private module: QuickJSWASMModule | null = null;
   private runtime: QuickJSRuntime | null = null;
   private context: QuickJSContext | null = null;
   private isInitialized = false;
 
   /**
-   * Initialize the QuickJS engine with local WASM
+   * Initialize the QuickJS engine
    */
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      // Use getQuickJS which handles WASM loading properly
-      this.module = await getQuickJS();
-      this.runtime = this.module.newRuntime();
+      const module = await getQuickJS();
+      this.runtime = module.newRuntime();
       
       // Set resource limits
       this.runtime.setMemoryLimit(1024 * 1024); // 1MB
       this.runtime.setMaxStackSize(1024 * 512);  // 512KB stack
       
       this.isInitialized = true;
+      console.log('[ScriptEngine] Initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize QuickJS:', error);
-      throw new Error('Script engine initialization failed: ' + (error instanceof Error ? error.message : String(error)));
+      console.error('[ScriptEngine] Failed to initialize:', error);
+      throw error;
     }
   }
 
@@ -53,11 +93,8 @@ export class ScriptEngine {
     this.context = this.runtime.newContext();
     
     try {
-      // Setup sandbox
-      this.setupSandbox();
-      
-      // Inject ctx object
-      this.injectContext(context);
+      // Setup sandbox and inject ctx
+      this.setupContext(context);
       
       // Wrap and execute script
       const wrappedScript = `
@@ -89,278 +126,157 @@ export class ScriptEngine {
   }
 
   /**
-   * Setup security sandbox - remove dangerous globals
+   * Setup context with sandbox and ctx object
    */
-  private setupSandbox(): void {
+  private setupContext(context: ScriptContext): void {
     if (!this.context) return;
 
     const ctx = this.context;
+
+    // Remove dangerous globals
     const dangerousGlobals = [
       'fetch', 'XMLHttpRequest', 'WebSocket',
       'localStorage', 'sessionStorage', 'indexedDB',
       'Worker', 'SharedArrayBuffer', 'importScripts'
     ];
-
     for (const name of dangerousGlobals) {
       ctx.setProp(ctx.global, name, ctx.undefined);
     }
-  }
 
-  /**
-   * Inject ctx object with utility functions
-   */
-  private injectContext(context: ScriptContext): void {
-    if (!this.context) return;
-
-    const ctx = this.context;
+    // Create ctx object
     const ctxHandle = ctx.newObject();
 
-    // Inject properties
+    // Properties
     ctx.setProp(ctxHandle, 'index', ctx.newNumber(context.index));
     ctx.setProp(ctxHandle, 'timestamp', ctx.newNumber(context.timestamp));
 
-    // Inject state object
+    // State object
     const stateHandle = ctx.newObject();
     for (const [key, value] of Object.entries(context.state)) {
-      this.setJSValue(stateHandle, key, value);
+      this.setValue(stateHandle, key, value);
     }
     ctx.setProp(ctxHandle, 'state', stateHandle);
 
-    // Inject utility functions
-    this.injectUtilityFunctions(ctxHandle);
+    // Utility functions
+    ctx.setProp(ctxHandle, 'random', ctx.newFunction('random', (minH, maxH) => {
+      const min = ctx.getNumber(minH);
+      const max = ctx.getNumber(maxH);
+      return ctx.newNumber(Math.floor(Math.random() * (max - min + 1)) + min);
+    }));
 
-    // Inject faker API
-    this.injectFakerAPI(ctxHandle);
+    ctx.setProp(ctxHandle, 'randomFloat', ctx.newFunction('randomFloat', (minH, maxH) => {
+      const min = ctx.getNumber(minH);
+      const max = ctx.getNumber(maxH);
+      return ctx.newNumber(Math.random() * (max - min) + min);
+    }));
 
+    ctx.setProp(ctxHandle, 'uuid', ctx.newFunction('uuid', () => ctx.newString(uuidv4())));
+    ctx.setProp(ctxHandle, 'now', ctx.newFunction('now', () => ctx.newString(new Date().toISOString())));
+    ctx.setProp(ctxHandle, 'hash', ctx.newFunction('hash', (strH) => ctx.newString(simpleHash(ctx.getString(strH)))));
+    ctx.setProp(ctxHandle, 'base64', ctx.newFunction('base64', (strH) => {
+      try {
+        return ctx.newString(btoa(ctx.getString(strH)));
+      } catch {
+        return ctx.newString('');
+      }
+    }));
+
+    // Faker API
+    const fakerHandle = ctx.newObject();
+    ctx.setProp(fakerHandle, 'name', ctx.newFunction('name', () => ctx.newString(fakerAPI.name())));
+    ctx.setProp(fakerHandle, 'email', ctx.newFunction('email', () => ctx.newString(fakerAPI.email())));
+    ctx.setProp(fakerHandle, 'phone', ctx.newFunction('phone', () => ctx.newString(fakerAPI.phone())));
+    ctx.setProp(fakerHandle, 'address', ctx.newFunction('address', () => ctx.newString(fakerAPI.address())));
+    ctx.setProp(fakerHandle, 'company', ctx.newFunction('company', () => ctx.newString(fakerAPI.company())));
+    ctx.setProp(fakerHandle, 'lorem', ctx.newFunction('lorem', (countH) => {
+      const count = ctx.getNumber(countH);
+      return ctx.newString(fakerAPI.lorem(count));
+    }));
+    ctx.setProp(ctxHandle, 'faker', fakerHandle);
+
+    // Set ctx global
     ctx.setProp(ctx.global, 'ctx', ctxHandle);
   }
 
   /**
-   * Inject utility functions into ctx
-   */
-  private injectUtilityFunctions(ctxHandle: any): void {
-    if (!this.context) return;
-
-    const ctx = this.context;
-
-    // random(min, max)
-    const randomFn = ctx.newFunction('random', (minHandle, maxHandle) => {
-      const min = ctx.getNumber(minHandle);
-      const max = ctx.getNumber(maxHandle);
-      const result = Math.floor(Math.random() * (max - min + 1)) + min;
-      return ctx.newNumber(result);
-    });
-    ctx.setProp(ctxHandle, 'random', randomFn);
-
-    // randomFloat(min, max)
-    const randomFloatFn = ctx.newFunction('randomFloat', (minHandle, maxHandle) => {
-      const min = ctx.getNumber(minHandle);
-      const max = ctx.getNumber(maxHandle);
-      const result = Math.random() * (max - min) + min;
-      return ctx.newNumber(result);
-    });
-    ctx.setProp(ctxHandle, 'randomFloat', randomFloatFn);
-
-    // uuid()
-    const uuidFn = ctx.newFunction('uuid', () => {
-      return ctx.newString(uuidv4());
-    });
-    ctx.setProp(ctxHandle, 'uuid', uuidFn);
-
-    // now() - ISO timestamp
-    const nowFn = ctx.newFunction('now', () => {
-      return ctx.newString(new Date().toISOString());
-    });
-    ctx.setProp(ctxHandle, 'now', nowFn);
-
-    // hash(str)
-    const hashFn = ctx.newFunction('hash', (strHandle) => {
-      const str = ctx.getString(strHandle);
-      // Simple hash - in production use proper hash library
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      return ctx.newString(Math.abs(hash).toString(16));
-    });
-    ctx.setProp(ctxHandle, 'hash', hashFn);
-
-    // base64(str)
-    const base64Fn = ctx.newFunction('base64', (strHandle) => {
-      const str = ctx.getString(strHandle);
-      try {
-        const encoded = btoa(str);
-        return ctx.newString(encoded);
-      } catch {
-        return ctx.newString('');
-      }
-    });
-    ctx.setProp(ctxHandle, 'base64', base64Fn);
-  }
-
-  /**
-   * Inject faker API into ctx
-   */
-  private injectFakerAPI(ctxHandle: any): void {
-    if (!this.context) return;
-
-    const ctx = this.context;
-    const fakerHandle = ctx.newObject();
-
-    // Simple faker implementations
-    const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda'];
-    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis'];
-    const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'example.com'];
-    const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia'];
-    const companies = ['Acme Corp', 'Globex', 'Initech', 'Hooli', 'Umbrella Corp'];
-
-    // name()
-    ctx.setProp(fakerHandle, 'name', ctx.newFunction('name', () => {
-      const first = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const last = lastNames[Math.floor(Math.random() * lastNames.length)];
-      return ctx.newString(`${first} ${last}`);
-    }));
-
-    // email()
-    ctx.setProp(fakerHandle, 'email', ctx.newFunction('email', () => {
-      const first = firstNames[Math.floor(Math.random() * firstNames.length)].toLowerCase();
-      const last = lastNames[Math.floor(Math.random() * lastNames.length)].toLowerCase();
-      const domain = domains[Math.floor(Math.random() * domains.length)];
-      return ctx.newString(`${first}.${last}@${domain}`);
-    }));
-
-    // phone()
-    ctx.setProp(fakerHandle, 'phone', ctx.newFunction('phone', () => {
-      const phone = `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
-      return ctx.newString(phone);
-    }));
-
-    // address()
-    ctx.setProp(fakerHandle, 'address', ctx.newFunction('address', () => {
-      const num = Math.floor(Math.random() * 9000) + 1000;
-      const street = ['Main St', 'Oak Ave', 'Park Rd', 'Cedar Ln'][Math.floor(Math.random() * 4)];
-      const city = cities[Math.floor(Math.random() * cities.length)];
-      return ctx.newString(`${num} ${street}, ${city}`);
-    }));
-
-    // company()
-    ctx.setProp(fakerHandle, 'company', ctx.newFunction('company', () => {
-      const company = companies[Math.floor(Math.random() * companies.length)];
-      return ctx.newString(company);
-    }));
-
-    // lorem(words)
-    ctx.setProp(fakerHandle, 'lorem', ctx.newFunction('lorem', (countHandle) => {
-      const count = ctx.getNumber(countHandle);
-      const words = ['lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit', 'sed', 'do', 'eiusmod', 'tempor'];
-      const result = [];
-      for (let i = 0; i < count; i++) {
-        result.push(words[Math.floor(Math.random() * words.length)]);
-      }
-      return ctx.newString(result.join(' '));
-    }));
-
-    ctx.setProp(ctxHandle, 'faker', fakerHandle);
-  }
-
-  /**
-   * Convert a QuickJS handle to a JavaScript object
+   * Convert QuickJS handle to JS object
    */
   private toJSObject(handle: any): any {
     if (!this.context) return null;
-
     const ctx = this.context;
     const type = ctx.typeof(handle);
 
     switch (type) {
-      case 'number':
-        return ctx.getNumber(handle);
-      case 'string':
-        return ctx.getString(handle);
-      case 'boolean':
-        return handle.value === 1;
-      case 'null':
-        return null;
-      case 'undefined':
-        return undefined;
+      case 'number': return ctx.getNumber(handle);
+      case 'string': return ctx.getString(handle);
+      case 'boolean': return handle.value === 1;
+      case 'null': return null;
+      case 'undefined': return undefined;
       case 'object': {
-        // Check if array
         const lengthHandle = ctx.getProp(handle, 'length');
         if (ctx.typeof(lengthHandle) === 'number') {
           // Array
+          const len = ctx.getNumber(lengthHandle);
           lengthHandle.dispose();
-          const result: any[] = [];
-          const len = ctx.getNumber(ctx.getProp(handle, 'length'));
+          const arr: any[] = [];
           for (let i = 0; i < len; i++) {
-            const itemHandle = ctx.getProp(handle, i);
-            result.push(this.toJSObject(itemHandle));
-            itemHandle.dispose();
+            const item = ctx.getProp(handle, i);
+            arr.push(this.toJSObject(item));
+            item.dispose();
           }
-          return result;
+          return arr;
         } else {
           lengthHandle.dispose();
-          // Object - convert all enumerable properties
-          const result: Record<string, any> = {};
-          const propNames = ['key', 'value', 'headers', 'symbol', 'timestamp', 'price', 'change', 'volume', 'deviceId', 'readings', 'status', 'orderId', 'customer', 'items'];
-          for (const key of propNames) {
+          // Object - try to get all properties
+          const obj: Record<string, any> = {};
+          // Common property names for our use case
+          const props = ['key', 'value', 'headers', 'symbol', 'timestamp', 'price', 'change', 
+            'changePercent', 'volume', 'dayHigh', 'dayLow', 'dayOpen', 'deviceId', 'readings', 
+            'temperature', 'humidity', 'pressure', 'status', 'orderId', 'customer', 'items',
+            'amount', 'currency', 'level', 'service', 'message', 'traceId', 'event', 'userId'];
+          for (const prop of props) {
             try {
-              const propHandle = ctx.getProp(handle, key);
-              if (ctx.typeof(propHandle) !== 'undefined') {
-                result[key] = this.toJSObject(propHandle);
+              const val = ctx.getProp(handle, prop);
+              if (ctx.typeof(val) !== 'undefined') {
+                obj[prop] = this.toJSObject(val);
               }
-              propHandle.dispose();
+              val.dispose();
             } catch {
-              // Property doesn't exist
+              // Ignore
             }
           }
-          return result;
+          return obj;
         }
       }
-      default:
-        return null;
+      default: return null;
     }
   }
 
   /**
-   * Set a JavaScript value on a QuickJS object
+   * Set JS value on QuickJS object
    */
-  private setJSValue(objHandle: any, key: string, value: any): void {
+  private setValue(obj: any, key: string, value: any): void {
     if (!this.context) return;
-
     const ctx = this.context;
 
-    if (value === null) {
-      ctx.setProp(objHandle, key, ctx.null);
-    } else if (value === undefined) {
-      ctx.setProp(objHandle, key, ctx.undefined);
-    } else if (typeof value === 'number') {
-      ctx.setProp(objHandle, key, ctx.newNumber(value));
-    } else if (typeof value === 'string') {
-      ctx.setProp(objHandle, key, ctx.newString(value));
-    } else if (typeof value === 'boolean') {
-      ctx.setProp(objHandle, key, value ? ctx.true : ctx.false);
+    if (value === null) ctx.setProp(obj, key, ctx.null);
+    else if (value === undefined) ctx.setProp(obj, key, ctx.undefined);
+    else if (typeof value === 'number') ctx.setProp(obj, key, ctx.newNumber(value));
+    else if (typeof value === 'string') ctx.setProp(obj, key, ctx.newString(value));
+    else if (typeof value === 'boolean') ctx.setProp(obj, key, value ? ctx.true : ctx.false);
+    else if (Array.isArray(value)) {
+      const arr = ctx.newArray();
+      value.forEach((v, i) => this.setValue(arr, i.toString(), v));
+      ctx.setProp(obj, key, arr);
     } else if (typeof value === 'object') {
-      if (Array.isArray(value)) {
-        const arrHandle = ctx.newArray();
-        value.forEach((item, index) => {
-          this.setJSValue(arrHandle, index.toString(), item);
-        });
-        ctx.setProp(objHandle, key, arrHandle);
-      } else {
-        const nestedObjHandle = ctx.newObject();
-        for (const [nestedKey, nestedValue] of Object.entries(value)) {
-          this.setJSValue(nestedObjHandle, nestedKey, nestedValue);
-        }
-        ctx.setProp(objHandle, key, nestedObjHandle);
+      const nested = ctx.newObject();
+      for (const [k, v] of Object.entries(value)) {
+        this.setValue(nested, k, v);
       }
+      ctx.setProp(obj, key, nested);
     }
   }
 
-  /**
-   * Dispose the engine and free resources
-   */
   dispose(): void {
     if (this.context) {
       this.context.dispose();
@@ -370,25 +286,24 @@ export class ScriptEngine {
       this.runtime.dispose();
       this.runtime = null;
     }
-    // Note: Don't dispose the module as it's a singleton from getQuickJS
     this.isInitialized = false;
   }
 }
 
-// Singleton instance
-let scriptEngineInstance: ScriptEngine | null = null;
+// Singleton
+let instance: ScriptEngine | null = null;
 
 export async function getScriptEngine(): Promise<ScriptEngine> {
-  if (!scriptEngineInstance) {
-    scriptEngineInstance = new ScriptEngine();
-    await scriptEngineInstance.init();
+  if (!instance) {
+    instance = new ScriptEngine();
+    await instance.init();
   }
-  return scriptEngineInstance;
+  return instance;
 }
 
 export function disposeScriptEngine(): void {
-  if (scriptEngineInstance) {
-    scriptEngineInstance.dispose();
-    scriptEngineInstance = null;
+  if (instance) {
+    instance.dispose();
+    instance = null;
   }
 }
