@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const iotSensorTemplate: ScriptTemplate = {
   id: 'iot-sensor',
-  name: 'IoT Sensor Data',
-  description: 'Simulate temperature, humidity, and pressure sensors',
+  nameKey: 'producer.script.templates.iotSensor.name',
+  descriptionKey: 'producer.script.templates.iotSensor.desc',
   category: 'iot',
   script: `function generate(ctx) {
   // Device ID based on index

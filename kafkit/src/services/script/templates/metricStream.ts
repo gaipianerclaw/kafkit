@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const metricStreamTemplate: ScriptTemplate = {
   id: 'metric-stream',
-  name: 'System Metrics',
-  description: 'CPU, memory, and disk usage metrics',
+  nameKey: 'producer.script.templates.metricStream.name',
+  descriptionKey: 'producer.script.templates.metricStream.desc',
   category: 'system',
   script: `function generate(ctx) {
   // Metric types

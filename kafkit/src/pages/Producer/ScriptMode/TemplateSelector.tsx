@@ -19,6 +19,18 @@ const categoryIcons: Record<string, ReactNode> = {
   system: <Activity className="w-4 h-4" />,
 };
 
+// Map template id to i18n key
+const templateKeyMap: Record<string, string> = {
+  'iot-sensor': 'iotSensor',
+  'ecommerce-order': 'ecommerceOrder',
+  'log-stream': 'logStream',
+  'stock-ticker': 'stockTicker',
+  'user-activity': 'userActivity',
+  'metric-stream': 'metricStream',
+  'social-feed': 'socialFeed',
+  'transaction': 'transaction',
+};
+
 export function TemplateSelector({ templates, selectedId, onSelect }: TemplateSelectorProps) {
   const { t } = useTranslation();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['iot']));
@@ -40,6 +52,22 @@ export function TemplateSelector({ templates, selectedId, onSelect }: TemplateSe
       newExpanded.add(category);
     }
     setExpandedCategories(newExpanded);
+  };
+
+  const getTemplateName = (template: ScriptTemplate): string => {
+    const key = templateKeyMap[template.id];
+    if (key && template.nameKey) {
+      return t(template.nameKey);
+    }
+    return template.name || template.id;
+  };
+
+  const getTemplateDesc = (template: ScriptTemplate): string => {
+    const key = templateKeyMap[template.id];
+    if (key && template.descriptionKey) {
+      return t(template.descriptionKey);
+    }
+    return template.description || '';
   };
 
   return (
@@ -84,9 +112,9 @@ export function TemplateSelector({ templates, selectedId, onSelect }: TemplateSe
                         : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground border-l-2 border-transparent'
                     }`}
                   >
-                    <div className="font-medium truncate">{template.name}</div>
+                    <div className="font-medium truncate">{getTemplateName(template)}</div>
                     <div className="text-xs opacity-70 truncate mt-0.5">
-                      {template.description}
+                      {getTemplateDesc(template)}
                     </div>
                   </button>
                 ))}

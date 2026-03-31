@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const transactionTemplate: ScriptTemplate = {
   id: 'transaction',
-  name: 'Financial Transactions',
-  description: 'Payment and transfer transactions',
+  nameKey: 'producer.script.templates.transaction.name',
+  descriptionKey: 'producer.script.templates.transaction.desc',
   category: 'finance',
   script: `function generate(ctx) {
   // Transaction types

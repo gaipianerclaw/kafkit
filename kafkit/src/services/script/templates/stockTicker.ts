@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const stockTickerTemplate: ScriptTemplate = {
   id: 'stock-ticker',
-  name: 'Stock Market Ticker',
-  description: 'Real-time stock price updates with volume',
+  nameKey: 'producer.script.templates.stockTicker.name',
+  descriptionKey: 'producer.script.templates.stockTicker.desc',
   category: 'finance',
   script: `function generate(ctx) {
   // Stock symbols

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal } from 'lucide-react';
+import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +63,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   const [task, setTask] = useState<SendTask | null>(null);
   
   // Preview state
+  const [showPreview, setShowPreview] = useState(false);
   const [preview, setPreview] = useState<ScriptMessage | ScriptMessage[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   
@@ -88,6 +89,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   const handlePreview = async () => {
     setPreviewError(null);
     setPreview(null);
+    setShowPreview(true);
     
     try {
       // TODO: Implement script execution using QuickJS
@@ -104,6 +106,10 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Unknown error');
     }
+  };
+
+  const closePreview = () => {
+    setShowPreview(false);
   };
 
   // Stop execution
@@ -210,9 +216,9 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Main Layout: Left Sidebar + Right Content */}
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-5">
         {/* Left Sidebar */}
         <div className="col-span-3 space-y-5">
           {/* Template Selector */}
@@ -232,25 +238,48 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
         
         {/* Right Content */}
         <div className="col-span-9 space-y-5">
-          {/* Script Editor */}
-          <div className="border rounded-lg overflow-hidden shadow-sm">
-            <div className="bg-muted px-4 py-3 border-b flex items-center justify-between">
-              <span className="text-sm font-medium flex items-center gap-2">
-                <Terminal className="w-4 h-4" />
-                {t('producer.script.editor')}
-              </span>
-              <div className="flex items-center gap-2">
+          {/* Editor Row: Code + Preview side by side */}
+          <div className="grid grid-cols-2 gap-5">
+            {/* Script Editor */}
+            <div className="border rounded-lg overflow-hidden shadow-sm">
+              <div className="bg-muted px-4 py-3 border-b flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-2">
+                  <Terminal className="w-4 h-4" />
+                  {t('producer.script.editor')}
+                </span>
                 <Button variant="ghost" size="sm" onClick={handlePreview} disabled={isRunning}>
                   <Eye className="w-4 h-4 mr-1.5" />
                   {t('producer.script.preview')}
                 </Button>
               </div>
+              <ScriptEditor
+                value={script}
+                onChange={setScript}
+                height="350px"
+              />
             </div>
-            <ScriptEditor
-              value={script}
-              onChange={setScript}
-              height="320px"
-            />
+
+            {/* Preview Panel - Side by side with editor */}
+            <div className={`border rounded-lg overflow-hidden shadow-sm transition-all ${showPreview ? 'opacity-100' : 'opacity-60'}`}>
+              <div className="bg-muted px-4 py-3 border-b flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  {t('producer.script.preview')}
+                </span>
+                {showPreview && (
+                  <Button variant="ghost" size="sm" onClick={closePreview}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              <div className="h-[350px]">
+                <PreviewPanel 
+                  preview={preview} 
+                  error={previewError}
+                  embedded
+                />
+              </div>
+            </div>
           </div>
           
           {/* Send Strategy */}
@@ -444,17 +473,11 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
             </div>
           </div>
           
-          {/* Preview & Monitor */}
-          <div className="grid grid-cols-2 gap-5">
-            <PreviewPanel 
-              preview={preview} 
-              error={previewError}
-            />
-            <MonitorPanel 
-              task={task}
-              isRunning={isRunning}
-            />
-          </div>
+          {/* Monitor Panel - Full width below */}
+          <MonitorPanel 
+            task={task}
+            isRunning={isRunning}
+          />
         </div>
       </div>
     </div>

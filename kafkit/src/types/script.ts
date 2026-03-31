@@ -150,10 +150,14 @@ export interface SendTask {
 export interface ScriptTemplate {
   /** Template ID */
   id: string;
-  /** Display name */
-  name: string;
-  /** Description */
-  description: string;
+  /** Display name (for non-i18n fallback) */
+  name?: string;
+  /** i18n key for name */
+  nameKey?: string;
+  /** Description (for non-i18n fallback) */
+  description?: string;
+  /** i18n key for description */
+  descriptionKey?: string;
   /** Category */
   category: 'iot' | 'ecommerce' | 'log' | 'finance' | 'social' | 'system';
   /** Template script code */

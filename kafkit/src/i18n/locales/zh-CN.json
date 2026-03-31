@@ -275,6 +275,40 @@
         "social": "社交媒体",
         "system": "系统指标"
       },
+      "templates": {
+        "iotSensor": {
+          "name": "IoT 传感器数据",
+          "desc": "模拟温度、湿度和压力传感器数据"
+        },
+        "ecommerceOrder": {
+          "name": "电商订单",
+          "desc": "模拟订单生命周期事件（创建、支付、发货）"
+        },
+        "logStream": {
+          "name": "应用日志",
+          "desc": "生成结构化应用日志条目"
+        },
+        "stockTicker": {
+          "name": "股票行情",
+          "desc": "实时股票价格更新和交易量"
+        },
+        "userActivity": {
+          "name": "用户行为",
+          "desc": "用户交互和页面浏览追踪"
+        },
+        "metricStream": {
+          "name": "系统指标",
+          "desc": "CPU、内存和磁盘使用指标"
+        },
+        "socialFeed": {
+          "name": "社交媒体",
+          "desc": "用户帖子、点赞和评论"
+        },
+        "transaction": {
+          "name": "金融交易",
+          "desc": "支付和转账交易"
+        }
+      },
       "stats": {
         "sent": "已发送",
         "success": "成功",

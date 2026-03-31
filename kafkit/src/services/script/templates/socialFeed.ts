@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const socialFeedTemplate: ScriptTemplate = {
   id: 'social-feed',
-  name: 'Social Media Posts',
-  description: 'User posts, likes, and comments',
+  nameKey: 'producer.script.templates.socialFeed.name',
+  descriptionKey: 'producer.script.templates.socialFeed.desc',
   category: 'social',
   script: `function generate(ctx) {
   // Content types

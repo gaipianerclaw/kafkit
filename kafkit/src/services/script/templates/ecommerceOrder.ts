@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const ecommerceOrderTemplate: ScriptTemplate = {
   id: 'ecommerce-order',
-  name: 'E-commerce Orders',
-  description: 'Simulate order lifecycle events (created, paid, shipped)',
+  nameKey: 'producer.script.templates.ecommerceOrder.name',
+  descriptionKey: 'producer.script.templates.ecommerceOrder.desc',
   category: 'ecommerce',
   script: `function generate(ctx) {
   // Order status progression

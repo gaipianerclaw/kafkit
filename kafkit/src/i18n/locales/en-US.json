@@ -275,6 +275,40 @@
         "social": "Social Media",
         "system": "System Metrics"
       },
+      "templates": {
+        "iotSensor": {
+          "name": "IoT Sensor Data",
+          "desc": "Simulate temperature, humidity, and pressure sensors"
+        },
+        "ecommerceOrder": {
+          "name": "E-commerce Orders",
+          "desc": "Simulate order lifecycle events (created, paid, shipped)"
+        },
+        "logStream": {
+          "name": "Application Logs",
+          "desc": "Generate structured application log entries"
+        },
+        "stockTicker": {
+          "name": "Stock Market Ticker",
+          "desc": "Real-time stock price updates with volume"
+        },
+        "userActivity": {
+          "name": "User Activity Events",
+          "desc": "Track user interactions and page views"
+        },
+        "metricStream": {
+          "name": "System Metrics",
+          "desc": "CPU, memory, and disk usage metrics"
+        },
+        "socialFeed": {
+          "name": "Social Media Posts",
+          "desc": "User posts, likes, and comments"
+        },
+        "transaction": {
+          "name": "Financial Transactions",
+          "desc": "Payment and transfer transactions"
+        }
+      },
       "stats": {
         "sent": "Sent",
         "success": "Success",

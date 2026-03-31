@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const userActivityTemplate: ScriptTemplate = {
   id: 'user-activity',
-  name: 'User Activity Events',
-  description: 'Track user interactions and page views',
+  nameKey: 'producer.script.templates.userActivity.name',
+  descriptionKey: 'producer.script.templates.userActivity.desc',
   category: 'social',
   script: `function generate(ctx) {
   // Event types

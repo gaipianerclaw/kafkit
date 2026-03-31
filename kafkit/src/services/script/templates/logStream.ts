@@ -2,8 +2,8 @@ import type { ScriptTemplate } from '../../../types/script';
 
 export const logStreamTemplate: ScriptTemplate = {
   id: 'log-stream',
-  name: 'Application Logs',
-  description: 'Generate structured application log entries',
+  nameKey: 'producer.script.templates.logStream.name',
+  descriptionKey: 'producer.script.templates.logStream.desc',
   category: 'log',
   script: `function generate(ctx) {
   // Log levels with weighted distribution
