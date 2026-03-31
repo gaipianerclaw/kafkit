@@ -56,16 +56,16 @@ export function TemplateSelector({ templates, selectedId, onSelect }: TemplateSe
 
   const getTemplateName = (template: ScriptTemplate): string => {
     const key = templateKeyMap[template.id];
-    if (key && template.nameKey) {
-      return t(template.nameKey);
+    if (key) {
+      return t(`producer.script.templates.${key}.name`);
     }
     return template.name || template.id;
   };
 
   const getTemplateDesc = (template: ScriptTemplate): string => {
     const key = templateKeyMap[template.id];
-    if (key && template.descriptionKey) {
-      return t(template.descriptionKey);
+    if (key) {
+      return t(`producer.script.templates.${key}.desc`);
     }
     return template.description || '';
   };

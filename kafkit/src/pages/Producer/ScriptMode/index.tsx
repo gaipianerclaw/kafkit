@@ -7,11 +7,13 @@ import { ScriptEditor } from './ScriptEditor';
 import { TemplateSelector } from './TemplateSelector';
 import { KeyStrategyPanel } from './KeyStrategyPanel';
 import { MonitorPanel } from './MonitorPanel';
+import { getScriptEngine, disposeScriptEngine } from '../../../services/script/ScriptEngine';
 import type { 
   SendTask, 
   KeyStrategy, 
   ScriptMessage,
-  ScriptTemplate 
+  ScriptTemplate,
+  ScriptContext
 } from '../../../types/script';
 
 // 内置模板
@@ -68,6 +70,11 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   const [preview, setPreview] = useState<ScriptMessage | ScriptMessage[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
+  
+  // Script context state (for persistence across executions)
+  const scriptStateRef = useRef<Record<string, any>>({});
+  const messageIndexRef = useRef(0);
   
   // Refs for execution control
   const abortRef = useRef(false);
@@ -80,41 +87,88 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     errorLog: [] as { timestamp: number; message: string }[]
   });
 
+  // Initialize script engine
+  useEffect(() => {
+    const initEngine = async () => {
+      try {
+        await getScriptEngine();
+        setEngineReady(true);
+      } catch (error) {
+        console.error('Failed to initialize script engine:', error);
+        setPreviewError('Script engine initialization failed');
+      }
+    };
+    
+    initEngine();
+    
+    return () => {
+      disposeScriptEngine();
+    };
+  }, []);
+
   // Handle template selection
   const handleSelectTemplate = (template: ScriptTemplate) => {
     setScript(template.script);
     setKeyStrategy(template.defaultKeyStrategy);
     setSelectedTemplate(template.id);
+    // Reset preview when template changes
+    setPreview(null);
+    scriptStateRef.current = {};
+    messageIndexRef.current = 0;
   };
+
+  // Create script context
+  const createScriptContext = useCallback((): ScriptContext => {
+    return {
+      index: messageIndexRef.current,
+      state: scriptStateRef.current,
+      timestamp: Date.now(),
+      // These will be injected by the engine, but we define the interface here
+      random: () => 0,
+      randomFloat: () => 0,
+      uuid: () => '',
+      now: () => '',
+      hash: () => '',
+      base64: () => '',
+      faker: {
+        name: () => '',
+        email: () => '',
+        phone: () => '',
+        address: () => '',
+        company: () => '',
+        lorem: () => ''
+      }
+    };
+  }, []);
 
   // Generate preview data
   const generatePreview = useCallback(async () => {
+    if (!engineReady) {
+      setPreviewError('Script engine not ready');
+      return;
+    }
+
     setIsGenerating(true);
     setPreviewError(null);
     
     try {
-      // TODO: Implement actual script execution using QuickJS
-      // For now, show a mock preview that simulates script execution
-      const mockMessage: ScriptMessage = {
-        key: `key-${Date.now()}`,
-        value: {
-          id: 0,
-          message: "Preview output (QuickJS not yet integrated)",
-          timestamp: new Date().toISOString(),
-          script: script.substring(0, 100) + '...' // Show part of the script
-        }
-      };
+      const engine = await getScriptEngine();
+      const context = createScriptContext();
       
-      // Simulate async execution
-      await new Promise(resolve => setTimeout(resolve, 100));
-      setPreview(mockMessage);
+      const result = await engine.executeScript(script, context);
+      
+      // Update state for next execution
+      scriptStateRef.current = context.state;
+      messageIndexRef.current = context.index + 1;
+      
+      setPreview(result);
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : 'Unknown error');
+      setPreviewError(err instanceof Error ? err.message : 'Script execution failed');
       setPreview(null);
     } finally {
       setIsGenerating(false);
     }
-  }, [script]);
+  }, [engineReady, script, createScriptContext]);
 
   // Handle tab switch - auto generate preview when switching to preview tab
   const handleTabSwitch = useCallback((tab: 'script' | 'preview') => {
@@ -146,12 +200,17 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
 
   // Start execution
   const startExecution = async () => {
+    if (!engineReady) {
+      setPreviewError('Script engine not ready');
+      return;
+    }
+
     abortRef.current = false;
     pauseRef.current = false;
     setIsRunning(true);
     setIsPaused(false);
     
-    // Reset stats
+    // Reset stats and state
     statsRef.current = {
       sentCount: 0,
       successCount: 0,
@@ -159,9 +218,10 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
       startTime: Date.now(),
       errorLog: []
     };
+    scriptStateRef.current = {};
+    messageIndexRef.current = 0;
     
-    // TODO: Implement actual execution logic
-    // This is a placeholder that simulates execution
+    const engine = await getScriptEngine();
     
     const runLoop = async () => {
       while (!abortRef.current) {
@@ -178,38 +238,58 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
           break;
         }
         
-        // Simulate sending
-        await new Promise(resolve => setTimeout(resolve, 10));
-        statsRef.current.sentCount++;
-        statsRef.current.successCount++;
-        
-        // Update task state for UI
-        setTask({
-          id: 'task-1',
-          status: 'running',
-          config: {
-            mode: sendMode,
-            script,
-            keyStrategy,
-            targetTPS,
-            intervalMs,
-            cronExpression,
-            maxMessages,
-            maxDurationMs: maxDuration * 60 * 1000
-          },
-          sentCount: statsRef.current.sentCount,
-          successCount: statsRef.current.successCount,
-          failedCount: statsRef.current.failedCount,
-          startTime: statsRef.current.startTime,
-          errors: statsRef.current.errorLog,
-          currentTPS: Math.round(statsRef.current.sentCount / ((Date.now() - statsRef.current.startTime) / 1000))
-        });
-        
-        // Rate limiting based on mode
-        if (sendMode === 'tps') {
-          await new Promise(resolve => setTimeout(resolve, 1000 / targetTPS));
-        } else if (sendMode === 'interval') {
-          await new Promise(resolve => setTimeout(resolve, intervalMs));
+        try {
+          // Generate message using script
+          const context = createScriptContext();
+          const messages = await engine.executeScript(script, context);
+          
+          // Handle single message or array
+          const messageArray = Array.isArray(messages) ? messages : [messages];
+          
+          // Update state
+          scriptStateRef.current = context.state;
+          messageIndexRef.current = context.index + messageArray.length;
+          
+          // TODO: Send messages to Kafka
+          // For now just count them
+          statsRef.current.sentCount += messageArray.length;
+          statsRef.current.successCount += messageArray.length;
+          
+          // Update task state for UI
+          setTask({
+            id: 'task-1',
+            status: 'running',
+            config: {
+              mode: sendMode,
+              script,
+              keyStrategy,
+              targetTPS,
+              intervalMs,
+              cronExpression,
+              maxMessages,
+              maxDurationMs: maxDuration * 60 * 1000
+            },
+            sentCount: statsRef.current.sentCount,
+            successCount: statsRef.current.successCount,
+            failedCount: statsRef.current.failedCount,
+            startTime: statsRef.current.startTime,
+            errors: statsRef.current.errorLog,
+            currentTPS: Math.round(statsRef.current.sentCount / ((Date.now() - statsRef.current.startTime) / 1000))
+          });
+          
+          // Rate limiting based on mode
+          if (sendMode === 'tps') {
+            await new Promise(resolve => setTimeout(resolve, 1000 / targetTPS));
+          } else if (sendMode === 'interval') {
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Script execution failed';
+          statsRef.current.failedCount++;
+          statsRef.current.errorLog.push({
+            timestamp: Date.now(),
+            message: errorMsg
+          });
         }
       }
       
@@ -229,6 +309,15 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
 
   // Render preview content
   const renderPreviewContent = () => {
+    if (!engineReady) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Initializing script engine...</span>
+        </div>
+      );
+    }
+
     if (isGenerating) {
       return (
         <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
@@ -546,7 +635,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
             {/* Control Buttons */}
             <div className="flex justify-end gap-3">
               {!isRunning ? (
-                <Button onClick={startExecution} size="md">
+                <Button onClick={startExecution} size="md" disabled={!engineReady}>
                   <Play className="w-4 h-4 mr-2" />
                   {t('producer.script.start')}
                 </Button>
