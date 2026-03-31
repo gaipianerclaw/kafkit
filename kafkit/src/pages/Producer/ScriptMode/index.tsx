@@ -7,7 +7,7 @@ import { ScriptEditor } from './ScriptEditor';
 import { TemplateSelector } from './TemplateSelector';
 import { KeyStrategyPanel } from './KeyStrategyPanel';
 import { MonitorPanel } from './MonitorPanel';
-import { getScriptEngine, disposeScriptEngine } from '../../../services/script/ScriptEngine';
+import { getScriptEngine } from '../../../services/script/ScriptEngine';
 import type { 
   SendTask, 
   KeyStrategy, 
@@ -100,10 +100,6 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     };
     
     initEngine();
-    
-    return () => {
-      disposeScriptEngine();
-    };
   }, []);
 
   // Handle template selection
