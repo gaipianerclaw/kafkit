@@ -1,12 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal, X } from 'lucide-react';
+import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal, FileCode } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useTranslation } from 'react-i18next';
 import { ScriptEditor } from './ScriptEditor';
 import { TemplateSelector } from './TemplateSelector';
 import { KeyStrategyPanel } from './KeyStrategyPanel';
-import { PreviewPanel } from './PreviewPanel';
 import { MonitorPanel } from './MonitorPanel';
 import type { 
   SendTask, 
@@ -39,6 +38,9 @@ const defaultScript = `function generate(ctx) {
 export function ScriptMode({ connection: _connection, topic: _topic }: ScriptModeProps) {
   const { t } = useTranslation();
   
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'script' | 'preview'>('script');
+  
   // Editor state
   const [script, setScript] = useState(defaultScript);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
@@ -63,7 +65,6 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   const [task, setTask] = useState<SendTask | null>(null);
   
   // Preview state
-  const [showPreview, setShowPreview] = useState(false);
   const [preview, setPreview] = useState<ScriptMessage | ScriptMessage[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   
@@ -85,11 +86,10 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     setSelectedTemplate(template.id);
   };
 
-  // Handle preview
+  // Handle preview - switch to preview tab
   const handlePreview = async () => {
     setPreviewError(null);
     setPreview(null);
-    setShowPreview(true);
     
     try {
       // TODO: Implement script execution using QuickJS
@@ -103,13 +103,11 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
         }
       };
       setPreview(mockMessage);
+      setActiveTab('preview');
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Unknown error');
+      setActiveTab('preview');
     }
-  };
-
-  const closePreview = () => {
-    setShowPreview(false);
   };
 
   // Stop execution
@@ -238,47 +236,123 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
         
         {/* Right Content */}
         <div className="col-span-9 space-y-5">
-          {/* Editor Row: Code + Preview side by side */}
-          <div className="grid grid-cols-2 gap-5">
-            {/* Script Editor */}
-            <div className="border rounded-lg overflow-hidden shadow-sm">
-              <div className="bg-muted px-4 py-3 border-b flex items-center justify-between">
-                <span className="text-sm font-medium flex items-center gap-2">
+          {/* Editor/Preview Tabs */}
+          <div className="border rounded-lg overflow-hidden shadow-sm">
+            {/* Tab Header */}
+            <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab('script')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                    activeTab === 'script'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
                   <Terminal className="w-4 h-4" />
                   {t('producer.script.editor')}
-                </span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('preview')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                    activeTab === 'preview'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <Eye className="w-4 h-4" />
+                  {t('producer.script.preview')}
+                </button>
+              </div>
+              
+              {/* Preview Button */}
+              {activeTab === 'script' && (
                 <Button variant="ghost" size="sm" onClick={handlePreview} disabled={isRunning}>
                   <Eye className="w-4 h-4 mr-1.5" />
                   {t('producer.script.preview')}
                 </Button>
-              </div>
-              <ScriptEditor
-                value={script}
-                onChange={setScript}
-                height="350px"
-              />
+              )}
             </div>
-
-            {/* Preview Panel - Side by side with editor */}
-            <div className={`border rounded-lg overflow-hidden shadow-sm transition-all ${showPreview ? 'opacity-100' : 'opacity-60'}`}>
-              <div className="bg-muted px-4 py-3 border-b flex items-center justify-between">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  {t('producer.script.preview')}
-                </span>
-                {showPreview && (
-                  <Button variant="ghost" size="sm" onClick={closePreview}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              <div className="h-[350px]">
-                <PreviewPanel 
-                  preview={preview} 
-                  error={previewError}
-                  embedded
+            
+            {/* Tab Content */}
+            <div className="h-[450px]">
+              {activeTab === 'script' ? (
+                <ScriptEditor
+                  value={script}
+                  onChange={setScript}
+                  height="450px"
                 />
-              </div>
+              ) : (
+                <div className="h-full overflow-auto p-4 bg-muted/20">
+                  {previewError ? (
+                    <div className="flex items-start gap-2 text-red-600">
+                      <FileCode className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">Error</div>
+                        <div className="text-sm">{previewError}</div>
+                      </div>
+                    </div>
+                  ) : preview ? (
+                    <div className="space-y-4">
+                      {Array.isArray(preview) ? (
+                        <div className="text-sm text-muted-foreground">
+                          Generated {preview.length} messages:
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Generated message preview:
+                        </div>
+                      )}
+                      
+                      {(Array.isArray(preview) ? preview : [preview]).map((msg, idx) => (
+                        <div key={idx} className="bg-background rounded-lg p-4 border shadow-sm">
+                          <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                            Message {idx + 1}
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex gap-3">
+                              <span className="text-xs font-medium text-muted-foreground w-16">Key:</span>
+                              <span className="text-sm font-mono text-primary bg-primary/5 px-2 py-0.5 rounded">
+                                {msg.key || 'null'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Value:</span>
+                              <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
+                                {typeof msg.value === 'object' 
+                                  ? JSON.stringify(msg.value, null, 2) 
+                                  : msg.value}
+                              </pre>
+                            </div>
+                            {msg.headers && Object.keys(msg.headers).length > 0 && (
+                              <div>
+                                <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Headers:</span>
+                                <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
+                                  {JSON.stringify(msg.headers, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                        <Eye className="w-8 h-8 opacity-30" />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-medium">{t('producer.script.preview')}</p>
+                        <p className="text-sm mt-1">Click Preview button to generate message</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handlePreview} className="mt-2">
+                        <Eye className="w-4 h-4 mr-2" />
+                        {t('producer.script.preview')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           
@@ -473,7 +547,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
             </div>
           </div>
           
-          {/* Monitor Panel - Full width below */}
+          {/* Monitor Panel */}
           <MonitorPanel 
             task={task}
             isRunning={isRunning}
