@@ -5,7 +5,7 @@
  * Uses local WASM files for offline support
  */
 
-import { newQuickJSWASMModule, RELEASE_SYNC } from 'quickjs-emscripten';
+import { getQuickJS } from 'quickjs-emscripten';
 import type { QuickJSWASMModule, QuickJSRuntime, QuickJSContext } from 'quickjs-emscripten-core';
 import type { ScriptContext, ScriptMessage } from '../../types/script';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,8 +23,8 @@ export class ScriptEngine {
     if (this.isInitialized) return;
 
     try {
-      // Use RELEASE_SYNC variant with local WASM (no CDN)
-      this.module = await newQuickJSWASMModule(RELEASE_SYNC);
+      // Use getQuickJS which handles WASM loading properly
+      this.module = await getQuickJS();
       this.runtime = this.module.newRuntime();
       
       // Set resource limits
@@ -34,7 +34,7 @@ export class ScriptEngine {
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize QuickJS:', error);
-      throw new Error('Script engine initialization failed');
+      throw new Error('Script engine initialization failed: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -285,7 +285,7 @@ export class ScriptEngine {
         return null;
       case 'undefined':
         return undefined;
-      case 'object':
+      case 'object': {
         // Check if array
         const lengthHandle = ctx.getProp(handle, 'length');
         if (ctx.typeof(lengthHandle) === 'number') {
@@ -301,10 +301,9 @@ export class ScriptEngine {
           return result;
         } else {
           lengthHandle.dispose();
-          // Object
+          // Object - convert all enumerable properties
           const result: Record<string, any> = {};
-          // Try common property names
-          const propNames = ['key', 'value', 'headers'];
+          const propNames = ['key', 'value', 'headers', 'symbol', 'timestamp', 'price', 'change', 'volume', 'deviceId', 'readings', 'status', 'orderId', 'customer', 'items'];
           for (const key of propNames) {
             try {
               const propHandle = ctx.getProp(handle, key);
@@ -318,6 +317,7 @@ export class ScriptEngine {
           }
           return result;
         }
+      }
       default:
         return null;
     }
@@ -370,6 +370,7 @@ export class ScriptEngine {
       this.runtime.dispose();
       this.runtime = null;
     }
+    // Note: Don't dispose the module as it's a singleton from getQuickJS
     this.isInitialized = false;
   }
 }
