@@ -2,9 +2,11 @@
  * Script Engine Service - QuickJS Integration
  * 
  * Provides secure JavaScript execution environment for message generation
+ * Uses local WASM files for offline support
  */
 
-import { QuickJSWASMModule, getQuickJS, QuickJSRuntime, QuickJSContext } from 'quickjs-emscripten';
+import { newQuickJSWASMModule, RELEASE_SYNC } from 'quickjs-emscripten';
+import type { QuickJSWASMModule, QuickJSRuntime, QuickJSContext } from 'quickjs-emscripten-core';
 import type { ScriptContext, ScriptMessage } from '../../types/script';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,13 +17,14 @@ export class ScriptEngine {
   private isInitialized = false;
 
   /**
-   * Initialize the QuickJS engine
+   * Initialize the QuickJS engine with local WASM
    */
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      this.module = await getQuickJS();
+      // Use RELEASE_SYNC variant with local WASM (no CDN)
+      this.module = await newQuickJSWASMModule(RELEASE_SYNC);
       this.runtime = this.module.newRuntime();
       
       // Set resource limits
@@ -91,6 +94,7 @@ export class ScriptEngine {
   private setupSandbox(): void {
     if (!this.context) return;
 
+    const ctx = this.context;
     const dangerousGlobals = [
       'fetch', 'XMLHttpRequest', 'WebSocket',
       'localStorage', 'sessionStorage', 'indexedDB',
@@ -98,9 +102,7 @@ export class ScriptEngine {
     ];
 
     for (const name of dangerousGlobals) {
-      const globalObj = this.context.global;
-      const undefinedHandle = this.context.undefined;
-      this.context.setProp(globalObj, name, undefinedHandle);
+      ctx.setProp(ctx.global, name, ctx.undefined);
     }
   }
 
@@ -110,18 +112,19 @@ export class ScriptEngine {
   private injectContext(context: ScriptContext): void {
     if (!this.context) return;
 
-    const ctxHandle = this.context.newObject();
+    const ctx = this.context;
+    const ctxHandle = ctx.newObject();
 
     // Inject properties
-    this.context.setProp(ctxHandle, 'index', this.context.newNumber(context.index));
-    this.context.setProp(ctxHandle, 'timestamp', this.context.newNumber(context.timestamp));
+    ctx.setProp(ctxHandle, 'index', ctx.newNumber(context.index));
+    ctx.setProp(ctxHandle, 'timestamp', ctx.newNumber(context.timestamp));
 
     // Inject state object
-    const stateHandle = this.context.newObject();
+    const stateHandle = ctx.newObject();
     for (const [key, value] of Object.entries(context.state)) {
       this.setJSValue(stateHandle, key, value);
     }
-    this.context.setProp(ctxHandle, 'state', stateHandle);
+    ctx.setProp(ctxHandle, 'state', stateHandle);
 
     // Inject utility functions
     this.injectUtilityFunctions(ctxHandle);
@@ -129,7 +132,7 @@ export class ScriptEngine {
     // Inject faker API
     this.injectFakerAPI(ctxHandle);
 
-    this.context.setProp(this.context.global, 'ctx', ctxHandle);
+    ctx.setProp(ctx.global, 'ctx', ctxHandle);
   }
 
   /**
@@ -138,7 +141,7 @@ export class ScriptEngine {
   private injectUtilityFunctions(ctxHandle: any): void {
     if (!this.context) return;
 
-    const ctx = this.context; // local reference to avoid null checks
+    const ctx = this.context;
 
     // random(min, max)
     const randomFn = ctx.newFunction('random', (minHandle, maxHandle) => {
@@ -170,7 +173,7 @@ export class ScriptEngine {
     });
     ctx.setProp(ctxHandle, 'now', nowFn);
 
-    // hash(str, algo)
+    // hash(str)
     const hashFn = ctx.newFunction('hash', (strHandle) => {
       const str = ctx.getString(strHandle);
       // Simple hash - in production use proper hash library
@@ -203,7 +206,7 @@ export class ScriptEngine {
   private injectFakerAPI(ctxHandle: any): void {
     if (!this.context) return;
 
-    const ctx = this.context; // local reference
+    const ctx = this.context;
     const fakerHandle = ctx.newObject();
 
     // Simple faker implementations
@@ -268,13 +271,14 @@ export class ScriptEngine {
   private toJSObject(handle: any): any {
     if (!this.context) return null;
 
-    const type = this.context.typeof(handle);
+    const ctx = this.context;
+    const type = ctx.typeof(handle);
 
     switch (type) {
       case 'number':
-        return this.context.getNumber(handle);
+        return ctx.getNumber(handle);
       case 'string':
-        return this.context.getString(handle);
+        return ctx.getString(handle);
       case 'boolean':
         return handle.value === 1;
       case 'null':
@@ -282,28 +286,29 @@ export class ScriptEngine {
       case 'undefined':
         return undefined;
       case 'object':
-        if (this.context.getProp(handle, 'length').value !== undefined) {
+        // Check if array
+        const lengthHandle = ctx.getProp(handle, 'length');
+        if (ctx.typeof(lengthHandle) === 'number') {
           // Array
-          const result: any[] = [];
-          const lengthHandle = this.context.getProp(handle, 'length');
-          const length = this.context.getNumber(lengthHandle);
           lengthHandle.dispose();
-          
-          for (let i = 0; i < length; i++) {
-            const itemHandle = this.context.getProp(handle, i);
+          const result: any[] = [];
+          const len = ctx.getNumber(ctx.getProp(handle, 'length'));
+          for (let i = 0; i < len; i++) {
+            const itemHandle = ctx.getProp(handle, i);
             result.push(this.toJSObject(itemHandle));
             itemHandle.dispose();
           }
           return result;
         } else {
+          lengthHandle.dispose();
           // Object
           const result: Record<string, any> = {};
-          // Use a simpler approach - get all own property names
-          const propNames = ['key', 'value', 'headers']; // Common props we care about
+          // Try common property names
+          const propNames = ['key', 'value', 'headers'];
           for (const key of propNames) {
             try {
-              const propHandle = this.context.getProp(handle, key);
-              if (this.context.typeof(propHandle) !== 'undefined') {
+              const propHandle = ctx.getProp(handle, key);
+              if (ctx.typeof(propHandle) !== 'undefined') {
                 result[key] = this.toJSObject(propHandle);
               }
               propHandle.dispose();
@@ -324,29 +329,31 @@ export class ScriptEngine {
   private setJSValue(objHandle: any, key: string, value: any): void {
     if (!this.context) return;
 
+    const ctx = this.context;
+
     if (value === null) {
-      this.context.setProp(objHandle, key, this.context.null);
+      ctx.setProp(objHandle, key, ctx.null);
     } else if (value === undefined) {
-      this.context.setProp(objHandle, key, this.context.undefined);
+      ctx.setProp(objHandle, key, ctx.undefined);
     } else if (typeof value === 'number') {
-      this.context.setProp(objHandle, key, this.context.newNumber(value));
+      ctx.setProp(objHandle, key, ctx.newNumber(value));
     } else if (typeof value === 'string') {
-      this.context.setProp(objHandle, key, this.context.newString(value));
+      ctx.setProp(objHandle, key, ctx.newString(value));
     } else if (typeof value === 'boolean') {
-      this.context.setProp(objHandle, key, value ? this.context.true : this.context.false);
+      ctx.setProp(objHandle, key, value ? ctx.true : ctx.false);
     } else if (typeof value === 'object') {
       if (Array.isArray(value)) {
-        const arrHandle = this.context.newArray();
+        const arrHandle = ctx.newArray();
         value.forEach((item, index) => {
           this.setJSValue(arrHandle, index.toString(), item);
         });
-        this.context.setProp(objHandle, key, arrHandle);
+        ctx.setProp(objHandle, key, arrHandle);
       } else {
-        const nestedObjHandle = this.context.newObject();
+        const nestedObjHandle = ctx.newObject();
         for (const [nestedKey, nestedValue] of Object.entries(value)) {
           this.setJSValue(nestedObjHandle, nestedKey, nestedValue);
         }
-        this.context.setProp(objHandle, key, nestedObjHandle);
+        ctx.setProp(objHandle, key, nestedObjHandle);
       }
     }
   }

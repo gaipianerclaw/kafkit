@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import wasm from "vite-plugin-wasm";
 
 export default defineConfig(async () => ({
   plugins: [
     react(),
+    wasm(),
     {
       name: "html-transform",
       transformIndexHtml(html) {
