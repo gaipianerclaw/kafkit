@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal, FileCode } from 'lucide-react';
+import { Play, Pause, Square, Eye, Settings, Zap, Clock, Timer, Terminal, AlertCircle } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +67,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
   // Preview state
   const [preview, setPreview] = useState<ScriptMessage | ScriptMessage[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // Refs for execution control
   const abortRef = useRef(false);
@@ -86,29 +87,42 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     setSelectedTemplate(template.id);
   };
 
-  // Handle preview - switch to preview tab
-  const handlePreview = async () => {
+  // Generate preview data
+  const generatePreview = useCallback(async () => {
+    setIsGenerating(true);
     setPreviewError(null);
-    setPreview(null);
     
     try {
-      // TODO: Implement script execution using QuickJS
-      // For now, show a mock preview
+      // TODO: Implement actual script execution using QuickJS
+      // For now, show a mock preview that simulates script execution
       const mockMessage: ScriptMessage = {
         key: `key-${Date.now()}`,
         value: {
           id: 0,
           message: "Preview output (QuickJS not yet integrated)",
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          script: script.substring(0, 100) + '...' // Show part of the script
         }
       };
+      
+      // Simulate async execution
+      await new Promise(resolve => setTimeout(resolve, 100));
       setPreview(mockMessage);
-      setActiveTab('preview');
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Unknown error');
-      setActiveTab('preview');
+      setPreview(null);
+    } finally {
+      setIsGenerating(false);
     }
-  };
+  }, [script]);
+
+  // Handle tab switch - auto generate preview when switching to preview tab
+  const handleTabSwitch = useCallback((tab: 'script' | 'preview') => {
+    setActiveTab(tab);
+    if (tab === 'preview') {
+      generatePreview();
+    }
+  }, [generatePreview]);
 
   // Stop execution
   const stopExecution = useCallback(() => {
@@ -213,6 +227,90 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
     };
   }, []);
 
+  // Render preview content
+  const renderPreviewContent = () => {
+    if (isGenerating) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">{t('common.loading')}</span>
+        </div>
+      );
+    }
+
+    if (previewError) {
+      return (
+        <div className="flex items-start gap-3 text-red-600 p-4">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-medium">{t('producer.script.previewPanel.error')}</div>
+            <div className="text-sm mt-1">{previewError}</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (preview) {
+      return (
+        <div className="space-y-4">
+          {Array.isArray(preview) ? (
+            <div className="text-sm text-muted-foreground">
+              {t('producer.script.previewPanel.generatedCount', { count: preview.length })}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              {t('producer.script.previewPanel.generatedMsg')}
+            </div>
+          )}
+          
+          {(Array.isArray(preview) ? preview : [preview]).map((msg, idx) => (
+            <div key={idx} className="bg-background rounded-lg p-4 border shadow-sm">
+              <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                Message {idx + 1}
+              </div>
+              <div className="space-y-2">
+                <div className="flex gap-3">
+                  <span className="text-xs font-medium text-muted-foreground w-16">Key:</span>
+                  <span className="text-sm font-mono text-primary bg-primary/5 px-2 py-0.5 rounded">
+                    {msg.key || 'null'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Value:</span>
+                  <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
+                    {typeof msg.value === 'object' 
+                      ? JSON.stringify(msg.value, null, 2) 
+                      : msg.value}
+                  </pre>
+                </div>
+                {msg.headers && Object.keys(msg.headers).length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Headers:</span>
+                    <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
+                      {JSON.stringify(msg.headers, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+          <Eye className="w-8 h-8 opacity-30" />
+        </div>
+        <div className="text-center">
+          <p className="font-medium">{t('producer.script.previewPanel.emptyTitle')}</p>
+          <p className="text-sm mt-1">{t('producer.script.previewPanel.emptyDesc')}</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-5">
       {/* Main Layout: Left Sidebar + Right Content */}
@@ -242,7 +340,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
             <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setActiveTab('script')}
+                  onClick={() => handleTabSwitch('script')}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                     activeTab === 'script'
                       ? 'bg-background text-foreground shadow-sm'
@@ -253,7 +351,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
                   {t('producer.script.editor')}
                 </button>
                 <button
-                  onClick={() => setActiveTab('preview')}
+                  onClick={() => handleTabSwitch('preview')}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                     activeTab === 'preview'
                       ? 'bg-background text-foreground shadow-sm'
@@ -264,14 +362,6 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
                   {t('producer.script.preview')}
                 </button>
               </div>
-              
-              {/* Preview Button */}
-              {activeTab === 'script' && (
-                <Button variant="ghost" size="sm" onClick={handlePreview} disabled={isRunning}>
-                  <Eye className="w-4 h-4 mr-1.5" />
-                  {t('producer.script.preview')}
-                </Button>
-              )}
             </div>
             
             {/* Tab Content */}
@@ -284,73 +374,7 @@ export function ScriptMode({ connection: _connection, topic: _topic }: ScriptMod
                 />
               ) : (
                 <div className="h-full overflow-auto p-4 bg-muted/20">
-                  {previewError ? (
-                    <div className="flex items-start gap-2 text-red-600">
-                      <FileCode className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-medium">Error</div>
-                        <div className="text-sm">{previewError}</div>
-                      </div>
-                    </div>
-                  ) : preview ? (
-                    <div className="space-y-4">
-                      {Array.isArray(preview) ? (
-                        <div className="text-sm text-muted-foreground">
-                          Generated {preview.length} messages:
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">
-                          Generated message preview:
-                        </div>
-                      )}
-                      
-                      {(Array.isArray(preview) ? preview : [preview]).map((msg, idx) => (
-                        <div key={idx} className="bg-background rounded-lg p-4 border shadow-sm">
-                          <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                            Message {idx + 1}
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex gap-3">
-                              <span className="text-xs font-medium text-muted-foreground w-16">Key:</span>
-                              <span className="text-sm font-mono text-primary bg-primary/5 px-2 py-0.5 rounded">
-                                {msg.key || 'null'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Value:</span>
-                              <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
-                                {typeof msg.value === 'object' 
-                                  ? JSON.stringify(msg.value, null, 2) 
-                                  : msg.value}
-                              </pre>
-                            </div>
-                            {msg.headers && Object.keys(msg.headers).length > 0 && (
-                              <div>
-                                <span className="text-xs font-medium text-muted-foreground w-16 inline-block">Headers:</span>
-                                <pre className="mt-2 p-3 bg-muted/50 rounded-lg font-mono text-xs overflow-x-auto">
-                                  {JSON.stringify(msg.headers, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                        <Eye className="w-8 h-8 opacity-30" />
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">{t('producer.script.preview')}</p>
-                        <p className="text-sm mt-1">Click Preview button to generate message</p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={handlePreview} className="mt-2">
-                        <Eye className="w-4 h-4 mr-2" />
-                        {t('producer.script.preview')}
-                      </Button>
-                    </div>
-                  )}
+                  {renderPreviewContent()}
                 </div>
               )}
             </div>

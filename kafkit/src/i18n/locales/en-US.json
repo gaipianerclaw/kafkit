@@ -315,6 +315,13 @@
         "failed": "Failed",
         "currentTPS": "Current TPS",
         "duration": "Duration"
+      },
+      "previewPanel": {
+        "emptyTitle": "Preview",
+        "emptyDesc": "Switch to Preview tab to see generated results",
+        "generatedMsg": "Generated message preview",
+        "generatedCount": "Generated {count} messages",
+        "error": "Error"
       }
     }
   },

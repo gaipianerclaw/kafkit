@@ -315,6 +315,13 @@
         "failed": "失败",
         "currentTPS": "当前 TPS",
         "duration": "运行时长"
+      },
+      "previewPanel": {
+        "emptyTitle": "预览",
+        "emptyDesc": "切换到预览标签查看生成结果",
+        "generatedMsg": "生成消息预览",
+        "generatedCount": "生成了 {count} 条消息",
+        "error": "错误"
       }
     }
   },
