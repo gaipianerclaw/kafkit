@@ -594,7 +594,81 @@ function buildRecord(
 
   // Modify timestamp in value if enabled
   if (valueTimestampConfig.enabled && valueTimestampConfig.fieldPath) {
-    value = modifyValueTimestamp(value, valueTimestampConfig);
+    // For CSV column paths (e.g., "csv_column_1"), we need the original CSV line
+    if (valueTimestampConfig.fieldPath.startsWith('csv_column_')) {
+      const columnIndex = parseInt(valueTimestampConfig.fieldPath.replace('csv_column_', ''), 10);
+      
+      // Get the original CSV line
+      let csvLine: string | undefined;
+      
+      // For JSONL with embedded CSV (like Kafka export format), use msg.value directly
+      // msg.value should be the CSV string when key/value fields are present
+      if (msg.value && typeof msg.value === 'string' && msg.value.includes(',') && !msg.value.startsWith('{')) {
+        // msg.value is the CSV line
+        csvLine = msg.value;
+      } else if (msg._raw?._line && typeof msg._raw._line === 'string' && msg._raw._line.includes(',') && !msg._raw._line.startsWith('{')) {
+        // Use stored original line if it's CSV format
+        csvLine = msg._raw._line;
+      } else {
+        // Rebuild CSV line from _raw data using header order
+        const data = msg._raw || {};
+        const headers = Object.keys(data).filter(h => !h.startsWith('_'));
+        csvLine = rebuildCsvRow(data, headers);
+      }
+      
+      if (csvLine) {
+        const parts = csvLine.split(',');
+        if (columnIndex >= 0 && columnIndex < parts.length) {
+          const newTimestamp = calculateNewTimestampValue(parts[columnIndex].trim(), valueTimestampConfig);
+          parts[columnIndex] = String(newTimestamp);
+          const modifiedLine = parts.join(',');
+          
+          // Update value based on mapping
+          if (mapping.valueColumn && msg._raw) {
+            // If valueColumn is set, extract the modified value from the column
+            const headers = Object.keys(msg._raw);
+            const valueIndex = headers.indexOf(mapping.valueColumn);
+            if (valueIndex >= 0 && valueIndex < parts.length) {
+              value = parts[valueIndex];
+            } else {
+              value = modifiedLine;
+            }
+          } else {
+            value = modifiedLine;
+          }
+        }
+      }
+    } else {
+      // For column name paths (e.g., "timestamp"), modify in msg._raw and rebuild value
+      const data = msg._raw || {};
+      const fieldPath = valueTimestampConfig.fieldPath;
+      
+      if (fieldPath in data) {
+        const originalValue = data[fieldPath];
+        const newValue = calculateNewTimestampValue(originalValue, valueTimestampConfig);
+        
+        // Create modified data with new timestamp
+        const modifiedData = { ...data, [fieldPath]: String(newValue) };
+        
+        // Rebuild value based on how it was originally built
+        if (msg.key !== undefined || msg.value !== undefined) {
+          // Check if original value was a CSV string (contains commas)
+          const originalValueStr = typeof msg.value === 'string' ? msg.value : '';
+          if (originalValueStr.includes(',') && !originalValueStr.startsWith('{')) {
+            // Rebuild as CSV row using original column order from Object.keys
+            value = rebuildCsvRow(modifiedData, Object.keys(data));
+          } else {
+            // Original value was JSON object
+            value = JSON.stringify(modifiedData);
+          }
+        } else if (mapping.valueColumn) {
+          value = modifiedData[mapping.valueColumn] || '';
+        } else {
+          // If no value column specified, rebuild as CSV row
+          value = rebuildCsvRow(modifiedData, Object.keys(data));
+        }
+      }
+    }
   }
 
   // Use original timestamp from file (metadata timestamp)
@@ -644,69 +718,6 @@ function extractTimestamp(msg: ParsedMessage): number | undefined {
   return undefined;
 }
 
-/**
- * Modify timestamp field within message value
- * Supports both JSON and CSV formats
- */
-function modifyValueTimestamp(value: string, config: ValueTimestampConfig): string {
-  // Handle CSV column path (e.g., "csv_column_1")
-  if (config.fieldPath.startsWith('csv_column_')) {
-    const columnIndex = parseInt(config.fieldPath.replace('csv_column_', ''), 10);
-    const parts = value.split(',');
-    
-    if (columnIndex >= 0 && columnIndex < parts.length) {
-      const newTimestamp = calculateNewTimestampValue(parts[columnIndex].trim(), config);
-      parts[columnIndex] = String(newTimestamp);
-      return parts.join(',');
-    }
-    return value;
-  }
-  
-  // Handle JSON object path
-  try {
-    const obj = JSON.parse(value);
-    const modified = modifyTimestampInObject(obj, config.fieldPath, config);
-    return JSON.stringify(modified);
-  } catch {
-    // If value is not valid JSON, return as-is
-    return value;
-  }
-}
-
-/**
- * Recursively modify timestamp in object at specified path
- */
-function modifyTimestampInObject(obj: any, path: string, config: ValueTimestampConfig): any {
-  const parts = path.split('.');
-  const newObj = { ...obj };
-  let current: any = newObj;
-
-  // Navigate to the parent of the target field
-  for (let i = 0; i < parts.length - 1; i++) {
-    const key = parts[i];
-    if (current[key] && typeof current[key] === 'object') {
-      current[key] = Array.isArray(current[key]) 
-        ? [...current[key]] 
-        : { ...current[key] };
-      current = current[key];
-    } else {
-      // Path doesn't exist, return original
-      return obj;
-    }
-  }
-
-  const lastKey = parts[parts.length - 1];
-  const originalValue = current[lastKey];
-  
-  if (originalValue === undefined) {
-    return obj;
-  }
-
-  // Calculate new timestamp
-  current[lastKey] = calculateNewTimestampValue(originalValue, config);
-
-  return newObj;
-}
 
 /**
  * Calculate new timestamp value based on config
@@ -718,7 +729,11 @@ function calculateNewTimestampValue(originalValue: any, config: ValueTimestampCo
   if (typeof originalValue === 'number') {
     originalMs = config.format === 'unix_sec' ? originalValue * 1000 : originalValue;
   } else if (typeof originalValue === 'string') {
-    originalMs = new Date(originalValue).getTime();
+    // Handle iso8601_space format by replacing space with 'T' for parsing
+    const parseValue = config.format === 'iso8601_space' 
+      ? originalValue.replace(' ', 'T') 
+      : originalValue;
+    originalMs = new Date(parseValue).getTime();
     if (isNaN(originalMs)) {
       return originalValue;
     }
@@ -774,6 +789,20 @@ function formatDateWithSpace(timestamp: number): string {
   
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
          `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${padMs(date.getMilliseconds())}`;
+}
+
+/**
+ * Rebuild a CSV row from modified data and original column order
+ */
+function rebuildCsvRow(data: Record<string, string>, headers: string[]): string {
+  return headers.map(header => {
+    const value = data[header] ?? '';
+    // Quote values that contain commas or quotes
+    if (value.includes(',') || value.includes('"')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  }).join(',');
 }
 
 function safeParseJson(str: string): Record<string, string> | undefined {

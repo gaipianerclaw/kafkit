@@ -87,6 +87,7 @@ export interface TopicDetail {
 // ================= 消息相关类型 =================
 
 export interface KafkaMessage {
+  topic?: string;      // Topic name (for multi-tab isolation)
   partition: number;
   offset: number;
   timestamp?: number;

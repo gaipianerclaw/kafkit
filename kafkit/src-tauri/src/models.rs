@@ -176,6 +176,8 @@ pub struct ConfigEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KafkaMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,  // Topic name (for multi-tab isolation)
     pub partition: i32,
     pub offset: i64,
     #[serde(skip_serializing_if = "Option::is_none")]

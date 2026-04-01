@@ -3,7 +3,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Plus, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 import { useTabStore } from '../../stores';
 import { TabItem } from './TabItem';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,6 @@ interface TabBarProps {
 
 export function TabBar({ onNewTab }: TabBarProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { tabs, activeTabId, activateTab, closeTab, reorderTabs, closeOtherTabs, closeTabsToRight } = useTabStore();
   // const { activeConnection } = useConnectionStore();
   const [contextMenu, setContextMenu] = useState<{
@@ -81,7 +80,8 @@ export function TabBar({ onNewTab }: TabBarProps) {
   };
 
   const goHome = () => {
-    navigate('/main/topics');
+    // Deactivate current tab to show Topic panel workspace, but keep all tabs open
+    activateTab(null);
   };
 
   // Keyboard shortcuts

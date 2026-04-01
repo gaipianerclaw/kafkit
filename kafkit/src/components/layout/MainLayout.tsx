@@ -1,44 +1,44 @@
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  List, 
+  Home,
   Users, 
-  Settings, 
-  Plus,
-  ChevronDown,
-  Server
+  Settings
 } from 'lucide-react';
 import { useConnectionStore, useTabStore } from '../../stores';
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import { QuickSearch } from '../QuickSearch';
-// import { AlertCenter } from '../AlertCenter';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { TabBar } from '../TabBar';
 import { TabContent } from '../TabBar/TabContent';
 import { NewTabDialog } from '../TabBar/NewTabDialog';
+import { TopicPanel } from '../TopicPanel';
+import { TopicDetailView } from '../TopicDetailView';
 
 export function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { connections, activeConnection, fetchConnections, setActiveConnection } = useConnectionStore();
-  const { tabs } = useTabStore();
-  const [showConnectionMenu, setShowConnectionMenu] = useState(false);
+  const { activeConnection, fetchConnections } = useConnectionStore();
+  const { tabs, activeTabId, activateTab } = useTabStore();
   const [showNewTabDialog, setShowNewTabDialog] = useState(false);
+  const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(true);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConnections();
   }, []);
 
-  // Check if we should show tabs or outlet
-  const isTopicsRoute = location.pathname === '/main/topics' || 
-                        location.pathname === '/main/topics/' ||
-                        location.pathname.startsWith('/main/topics/') && !location.pathname.includes('/consume') && !location.pathname.includes('/produce');
+  // When there is an active tab, show tab content, otherwise show topic panel workspace
+  const hasActiveTab = activeTabId !== null && tabs.length > 0;
+  
+  // Check current route
+  const isHomeRoute = location.pathname === '/main' || location.pathname === '/main/';
   const isGroupsRoute = location.pathname === '/main/groups';
   const isSettingsRoute = location.pathname === '/main/settings';
   const isConnectionsRoute = location.pathname.startsWith('/main/connections');
-  const showTabs = !isTopicsRoute && !isGroupsRoute && !isSettingsRoute && !isConnectionsRoute;
+  const isTopicsRoute = location.pathname === '/main/topics';
 
   // Global keyboard shortcuts
   const handleRefresh = useCallback(() => {
@@ -54,142 +54,116 @@ export function MainLayout() {
     { key: 'k', ctrl: true, handler: handleQuickSearch, description: 'Quick search' },
   ]);
 
-  const activeConn = connections.find(c => c.id === activeConnection);
+  // Handle sidebar navigation - deactivate tab to show workspace
+  const handleNavClick = useCallback((path: string) => {
+    activateTab(null);
+    setSelectedTopic(null);
+    navigate(path);
+  }, [activateTab, navigate]);
+
+  // Handle topic selection
+  const handleSelectTopic = useCallback((topic: string) => {
+    setSelectedTopic(topic);
+    // Deactivate any active tab to show the topic detail
+    activateTab(null);
+  }, [activateTab]);
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 h-screen border-r border-border bg-card flex flex-col flex-shrink-0 overflow-hidden">
+      {/* Left Sidebar - Navigation only */}
+      <aside className="w-16 h-screen border-r border-border bg-card flex flex-col flex-shrink-0 overflow-hidden">
         {/* Logo */}
-        <div className="h-14 flex items-center px-4 border-b border-border">
-          <img src="/logo.png" alt="Kafkit" className="w-8 h-8 mr-2 rounded-lg" />
-          <span className="font-semibold text-lg">Kafkit</span>
+        <div className="h-14 flex items-center justify-center border-b border-border">
+          <img src="/logo.png" alt="Kafkit" className="w-8 h-8 rounded-lg" />
         </div>
 
-        {/* Connection Selector */}
-        <div className="p-3 border-b border-border">
-          <div className="relative">
-            <button
-              onClick={() => setShowConnectionMenu(!showConnectionMenu)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-muted rounded-md hover:bg-muted/80 transition-colors"
-            >
-              <div className="flex items-center min-w-0">
-                <Server className="w-4 h-4 mr-2 flex-shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm">
-                  {activeConn ? activeConn.name : t('connections.selectConnection')}
-                </span>
-              </div>
-              <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-            </button>
-
-            {showConnectionMenu && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50">
-                {connections.map(conn => (
-                  <button
-                    key={conn.id}
-                    onClick={() => {
-                      setActiveConnection(conn.id);
-                      setShowConnectionMenu(false);
-                    }}
-                    className={`w-full flex items-center px-3 py-2 text-sm hover:bg-muted transition-colors ${
-                      activeConnection === conn.id ? 'bg-muted' : ''
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full mr-2 ${
-                      conn.isConnected ? 'bg-green-500' : 'bg-gray-400'
-                    }`} />
-                    <span className="truncate">{conn.name}</span>
-                  </button>
-                ))}
-                <div className="border-t border-border my-1" />
-                <button
-                  onClick={() => {
-                    navigate('/main/connections/new');
-                    setShowConnectionMenu(false);
-                  }}
-                  className="w-full flex items-center px-3 py-2 text-sm text-primary hover:bg-muted transition-colors"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('connections.new')}
-                </button>
-                <button
-                  onClick={() => {
-                    navigate('/main/connections');
-                    setShowConnectionMenu(false);
-                  }}
-                  className="w-full flex items-center px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  {t('connections.title')}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          <NavLink
-            to="/main/topics"
-            className={({ isActive }) =>
-              `flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`
-            }
+        {/* Navigation Icons */}
+        <nav className="flex-1 py-3 space-y-2 overflow-y-auto">
+          {/* Home */}
+          <button
+            onClick={() => handleNavClick('/main/topics')}
+            className={`w-full flex items-center justify-center py-3 transition-colors ${
+              isTopicsRoute || isHomeRoute
+                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            title="Topic 管理"
           >
-            <List className="w-4 h-4 mr-3" />
-            {t('nav.topics')}
-          </NavLink>
-          <NavLink
-            to="/main/groups"
-            className={({ isActive }) =>
-              `flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`
-            }
+            <Home className="w-5 h-5" />
+          </button>
+          
+          {/* Groups */}
+          <button
+            onClick={() => handleNavClick('/main/groups')}
+            className={`w-full flex items-center justify-center py-3 transition-colors ${
+              isGroupsRoute
+                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            title={t('nav.consumerGroups')}
           >
-            <Users className="w-4 h-4 mr-3" />
-            {t('nav.consumerGroups')}
-          </NavLink>
+            <Users className="w-5 h-5" />
+          </button>
         </nav>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-border">
-          <NavLink
-            to="/main/settings"
-            className={({ isActive }) =>
-              `flex items-center px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`
-            }
+        {/* Footer - Settings */}
+        <div className="py-3 border-t border-border">
+          <button
+            onClick={() => handleNavClick('/main/settings')}
+            className={`w-full flex items-center justify-center py-3 transition-colors ${
+              isSettingsRoute
+                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            title={t('nav.settings')}
           >
-            <Settings className="w-4 h-4 mr-3" />
-            {t('nav.settings')}
-          </NavLink>
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Topic Panel - Second column */}
+      <TopicPanel 
+        isOpen={isTopicPanelOpen} 
+        onToggle={() => setIsTopicPanelOpen(!isTopicPanelOpen)}
+        selectedTopic={selectedTopic}
+        onSelectTopic={handleSelectTopic}
+      />
+
+      {/* Main Workspace - Third column */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Tab Bar - shown when there are tabs or when on a tab route */}
-        {(tabs.length > 0 || showTabs) && (
+        {/* Tab Bar */}
+        {tabs.length > 0 && (
           <TabBar onNewTab={() => setShowNewTabDialog(true)} />
         )}
         
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
-          {isTopicsRoute || isGroupsRoute || isSettingsRoute || isConnectionsRoute ? (
-            <Outlet />
-          ) : tabs.length > 0 ? (
+        <div className="flex-1 overflow-hidden h-full flex flex-col">
+          {hasActiveTab ? (
             <TabContent />
+          ) : selectedTopic ? (
+            <TopicDetailView topicName={selectedTopic} />
           ) : (
-            <Outlet />
+            <div className="w-full h-full p-4">
+              {/* Default workspace view when no active tab */}
+              {isGroupsRoute ? (
+                <div>消费组页面（待实现）</div>
+              ) : isSettingsRoute ? (
+                <div>设置页面（待实现）</div>
+              ) : isConnectionsRoute ? (
+                <div>连接管理页面（待实现）</div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Home className="w-16 h-16 mb-4 opacity-20" />
+                  <p className="text-lg mb-2">欢迎使用 Kafkit</p>
+                  <p className="text-sm">
+                    {activeConnection 
+                      ? '在左侧 Topic 面板中选择一个 Topic 查看详情' 
+                      : '请先选择一个 Kafka 连接'}
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </main>

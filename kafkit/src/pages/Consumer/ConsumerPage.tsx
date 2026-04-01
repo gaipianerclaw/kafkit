@@ -605,6 +605,7 @@ interface ConsumerPageProps {
   tabId?: string;
   topic?: string;
   connectionId?: string;
+  isActive?: boolean;
 }
 
 export function ConsumerPage(props: ConsumerPageProps = {}) {
@@ -900,11 +901,35 @@ export function ConsumerPage(props: ConsumerPageProps = {}) {
     }
 
     try {
-      // 先设置事件监听，避免错过早期消息
-      const tauriEvent = await getTauriEvent();
+      // 如果是文件模式，先初始化文件
+      if (consumerConfig.mode === 'file') {
+        const initialized = await initFileWriter();
+        if (!initialized) {
+          console.log('[Kafkit] User cancelled file save dialog');
+          return;
+        }
+      }
+
+      const tauriService = await getService();
+      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
+      const offsetSpec = buildOffsetSpec();
       
+      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
+      
+      // 先启动消费，获取 sessionId
+      const sid = await tauriService.startConsuming(
+        activeConnection,
+        decodedTopic,
+        partition,
+        offsetSpec
+      );
+      setSessionId(sid);
+      
+      // 使用 sessionId 设置专属事件监听（多标签页隔离）
+      const tauriEvent = await getTauriEvent();
       if (tauriEvent && tauriEvent.listen) {
-        const unlisten = await tauriEvent.listen<KafkaMessage>('kafka-message', (event) => {
+        const eventName = `kafka-message-${sid}`;
+        const unlisten = await tauriEvent.listen<KafkaMessage>(eventName, (event) => {
           if (event.payload) {
             const msg = event.payload;
             
@@ -918,39 +943,13 @@ export function ConsumerPage(props: ConsumerPageProps = {}) {
           }
         });
         unlistenRef.current = unlisten;
+        console.log(`[Kafkit] Listening on event: ${eventName}`);
       }
-
-      // 如果是文件模式，先初始化文件
-      if (consumerConfig.mode === 'file') {
-        const initialized = await initFileWriter();
-        if (!initialized) {
-          console.log('[Kafkit] User cancelled file save dialog');
-          // 取消监听
-          if (unlistenRef.current) {
-            unlistenRef.current();
-            unlistenRef.current = null;
-          }
-          return;
-        }
-      }
-
-      const tauriService = await getService();
-      const partition = selectedPartition === 'all' ? undefined : parseInt(selectedPartition);
-      const offsetSpec = buildOffsetSpec();
       
-      console.log('[Kafkit] Starting consumption with offset:', offsetSpec);
-      
-      const sid = await tauriService.startConsuming(
-        activeConnection,
-        decodedTopic,
-        partition,
-        offsetSpec
-      );
-      setSessionId(sid);
       setIsConsuming(true);
     } catch (err) {
       alert(t('consumer.alerts.startFailed') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
-      // 出错时清理监听
+      // 出错时清理
       if (unlistenRef.current) {
         unlistenRef.current();
         unlistenRef.current = null;

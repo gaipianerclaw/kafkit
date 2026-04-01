@@ -28,7 +28,7 @@ export interface TabState {
   // Actions
   addTab: (type: TabType, topic: string, connectionId: string, config?: Tab['config']) => string;
   closeTab: (id: string) => void;
-  activateTab: (id: string) => void;
+  activateTab: (id: string | null) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateTabConfig: (id: string, config: Partial<Tab['config']>) => void;
   updateTabTitle: (id: string, title: string) => void;
@@ -73,6 +73,12 @@ export const useTabStore = create<TabState>()(
             activeTabId: existingTab.id
           });
           return existingTab.id;
+        }
+
+        // Check tab limit (max 10)
+        if (tabs.length >= 10) {
+          alert('最多只能打开 10 个标签页，请先关闭部分标签');
+          return '';
         }
 
         // Create new tab

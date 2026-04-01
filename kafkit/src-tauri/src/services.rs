@@ -1460,6 +1460,7 @@ impl ConsumerService {
                         };
                         
                         let kafka_msg = KafkaMessage {
+                            topic: Some(topic_clone.clone()),
                             partition: msg.partition(),
                             offset: msg.offset(),
                             timestamp: msg.timestamp().to_millis(),
@@ -1472,9 +1473,10 @@ impl ConsumerService {
                         println!("[Kafkit] Received message from {} partition {} offset {}", 
                             topic_clone, kafka_msg.partition, kafka_msg.offset);
 
-                        // 发送事件到前端
+                        // 发送事件到前端 - 使用 session 专属事件名（多标签页隔离）
                         use tauri::Emitter;
-                        if let Err(e) = window.emit("kafka-message", &kafka_msg) {
+                        let event_name = format!("kafka-message-{}", session_id_clone);
+                        if let Err(e) = window.emit(&event_name, &kafka_msg) {
                             println!("[Kafkit] Failed to emit message: {}", e);
                         }
                     }

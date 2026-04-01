@@ -425,6 +425,8 @@ async function* csvGenerator(
       if (headers) {
         try {
           const row = parseCsvRowRaw(trimmed, headers);
+          // Store original line for timestamp modification
+          row._line = trimmed;
           const msg = normalizeMessage(row);
           yield msg;
           lineNumber++;
@@ -442,7 +444,10 @@ async function* csvGenerator(
   // Process any remaining content
   if (buffer.trim() && !isFirstLine && headers) {
     try {
-      const row = parseCsvRowRaw(buffer.trim(), headers);
+      const trimmed = buffer.trim();
+      const row = parseCsvRowRaw(trimmed, headers);
+      // Store original line for timestamp modification
+      row._line = trimmed;
       const msg = normalizeMessage(row);
       yield msg;
       onProgress?.(lineNumber + 1);
@@ -511,7 +516,14 @@ function parseLine(line: string, format: FileFormat, _lineNumber: number): Parse
  */
 function parseJsonLine(line: string): ParsedMessage {
   const parsed = JSON.parse(line);
-  return normalizeMessage(parsed);
+  const msg = normalizeMessage(parsed);
+  // Store original line for timestamp modification
+  if (msg._raw) {
+    msg._raw._line = line;
+  } else {
+    msg._raw = { _line: line };
+  }
+  return msg;
 }
 
 /**
@@ -519,11 +531,11 @@ function parseJsonLine(line: string): ParsedMessage {
  */
 function normalizeMessage(data: any): ParsedMessage {
   if (typeof data === 'string') {
-    return { value: data };
+    return { value: data, _raw: { line: data } };
   }
   
   if (typeof data !== 'object' || data === null) {
-    return { value: String(data) };
+    return { value: String(data), _raw: { value: String(data) } };
   }
   
   // Handle Kafka consumer export format
@@ -533,12 +545,15 @@ function normalizeMessage(data: any): ParsedMessage {
       value: typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value),
       headers: data.headers,
       partition: data.partition,
+      _raw: data,
     };
   }
   
-  // Handle direct message format
+  // Handle direct message format (e.g., CSV parsed as object)
+  // Keep _raw for timestamp modification to work correctly
   return {
     value: data,
+    _raw: data,
   };
 }
 

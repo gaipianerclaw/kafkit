@@ -14,6 +14,7 @@ interface ProducerPageProps {
   tabId?: string;
   topic?: string;
   connectionId?: string;
+  isActive?: boolean;
 }
 
 export function ProducerPage(props: ProducerPageProps = {}) {

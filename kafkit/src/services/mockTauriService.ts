@@ -50,6 +50,7 @@ const generateMockMessages = (topic: string, count: number): KafkaMessage[] => {
   
   for (let i = 0; i < count; i++) {
     messages.push({
+      topic,  // Include topic for multi-tab isolation
       partition: Math.floor(Math.random() * 3),
       offset: 1000 + i,
       timestamp: now - (count - i) * 1000,

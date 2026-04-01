@@ -37,7 +37,14 @@ export function ValueTimestampMapper({
     const fields = new Map<string, DetectedField>();
 
     for (const msg of previewMessages.slice(0, 5)) {
-      const value = typeof msg.value === 'string' ? msg.value : JSON.stringify(msg.value);
+      // Handle object format (e.g., CSV parsed as object)
+      if (typeof msg.value === 'object' && msg.value !== null) {
+        // Try to find timestamp fields in object values
+        findTimestampFieldsInObjectValues(msg.value, fields);
+        continue;
+      }
+      
+      const value = String(msg.value);
       
       // Try JSON first
       try {
@@ -57,6 +64,72 @@ export function ValueTimestampMapper({
 
     return Array.from(fields.values());
   }, [previewMessages]);
+  
+  // Find timestamp fields in object values (for CSV-style objects)
+  const findTimestampFieldsInObjectValues = (obj: Record<string, any>, fields: Map<string, DetectedField>) => {
+    for (const [key, val] of Object.entries(obj)) {
+      if (typeof val !== 'string') continue;
+      
+      // Check for datetime pattern with space separator: yyyy-MM-dd HH:mm:ss.SSS
+      const spaceDatePattern = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)$/;
+      if (spaceDatePattern.test(val)) {
+        const date = new Date(val.replace(' ', 'T'));
+        if (!isNaN(date.getTime())) {
+          fields.set(key, {
+            path: key,
+            format: 'iso8601_space',
+            sampleValue: val,
+          });
+          continue;
+        }
+      }
+      
+      // Check for ISO 8601 format with T separator
+      const isoPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z?)$/;
+      if (isoPattern.test(val)) {
+        const date = new Date(val);
+        if (!isNaN(date.getTime())) {
+          fields.set(key, {
+            path: key,
+            format: 'iso8601',
+            sampleValue: val,
+          });
+          continue;
+        }
+      }
+      
+      // Check for Unix timestamp (ms) - 13 digits
+      if (/^\d{13}$/.test(val)) {
+        const ts = parseInt(val, 10);
+        const now = Date.now();
+        const tenYearsAgo = now - 10 * 365 * 24 * 60 * 60 * 1000;
+        const tenYearsFromNow = now + 10 * 365 * 24 * 60 * 60 * 1000;
+        if (ts > tenYearsAgo && ts < tenYearsFromNow) {
+          fields.set(key, {
+            path: key,
+            format: 'unix_ms',
+            sampleValue: val,
+          });
+          continue;
+        }
+      }
+      
+      // Check for Unix timestamp (sec) - 10 digits
+      if (/^\d{10}$/.test(val)) {
+        const ts = parseInt(val, 10) * 1000;
+        const now = Date.now();
+        const tenYearsAgo = now - 10 * 365 * 24 * 60 * 60 * 1000;
+        const tenYearsFromNow = now + 10 * 365 * 24 * 60 * 60 * 1000;
+        if (ts > tenYearsAgo && ts < tenYearsFromNow) {
+          fields.set(key, {
+            path: key,
+            format: 'unix_sec',
+            sampleValue: val,
+          });
+        }
+      }
+    }
+  };
   
   // Detect timestamp in CSV format value
   const detectCsvTimestamp = (value: string): DetectedField | null => {
@@ -235,18 +308,21 @@ export function ValueTimestampMapper({
   const generatePreview = useCallback((originalValue: string): string => {
     if (!config.enabled || !config.fieldPath) return originalValue;
 
-    // Handle CSV column path
+    // Handle CSV column path (raw CSV string format)
     if (config.fieldPath.startsWith('csv_column_')) {
       const modified = modifyTimestamp(null, config.fieldPath, config, originalValue);
       return String(modified);
     }
 
-    // Handle JSON path
+    // Handle object property path (for CSV parsed as object)
+    // First try to parse as JSON
     try {
       const obj = JSON.parse(originalValue);
       const modified = modifyTimestamp(obj, config.fieldPath, config);
       return JSON.stringify(modified, null, 2);
     } catch {
+      // Not JSON, treat as plain string value - check if fieldPath refers to a direct property
+      // This handles the case where msg.value is a string but we want to show what would change
       return originalValue;
     }
   }, [config]);
@@ -295,7 +371,11 @@ export function ValueTimestampMapper({
     if (typeof originalValue === 'number') {
       originalMs = cfg.format === 'unix_sec' ? originalValue * 1000 : originalValue;
     } else if (typeof originalValue === 'string') {
-      originalMs = new Date(originalValue).getTime();
+      // Handle iso8601_space format by replacing space with 'T' for parsing
+      const parseValue = cfg.format === 'iso8601_space' 
+        ? originalValue.replace(' ', 'T') 
+        : originalValue;
+      originalMs = new Date(parseValue).getTime();
     } else {
       return originalValue;
     }
