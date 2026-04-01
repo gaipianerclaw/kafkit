@@ -601,11 +601,21 @@ interface ConsumerConfig {
   fileFormat: 'json' | 'csv' | 'jsonl';
 }
 
-export function ConsumerPage() {
+interface ConsumerPageProps {
+  tabId?: string;
+  topic?: string;
+  connectionId?: string;
+}
+
+export function ConsumerPage(props: ConsumerPageProps = {}) {
   const navigate = useNavigate();
-  const { topic } = useParams();
-  const { activeConnection } = useConnectionStore();
+  const { topic: routeTopic } = useParams();
+  const { activeConnection: globalActiveConnection } = useConnectionStore();
   const { t } = useTranslation();
+  
+  // Use props if provided (tab mode), otherwise fall back to route params
+  const topic = props.topic ?? routeTopic ?? '';
+  const activeConnection = props.connectionId ?? globalActiveConnection;
   
   // 消息数量限制选项 - 移到组件内部
   const PREVIEW_LIMITS = [

@@ -10,11 +10,21 @@ import { BatchMode } from './BatchMode';
 import { ScheduledMode } from './ScheduledMode';
 import { FileMode } from './FileMode';
 
-export function ProducerPage() {
+interface ProducerPageProps {
+  tabId?: string;
+  topic?: string;
+  connectionId?: string;
+}
+
+export function ProducerPage(props: ProducerPageProps = {}) {
   const navigate = useNavigate();
-  const { topic } = useParams();
-  const { activeConnection } = useConnectionStore();
+  const { topic: routeTopic } = useParams();
+  const { activeConnection: globalActiveConnection } = useConnectionStore();
   const { t } = useTranslation();
+  
+  // Use props if provided (tab mode), otherwise fall back to route params
+  const topic = props.topic ?? routeTopic ?? '';
+  const activeConnection = props.connectionId ?? globalActiveConnection;
   
   const [mode, setMode] = useState<'single' | 'batch' | 'scheduled' | 'file'>('single');
   const [format, setFormat] = useState<'json' | 'text' | 'csv'>('text');

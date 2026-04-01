@@ -4,7 +4,7 @@ import { RefreshCw, Search, Plus, Trash2, Eye, Send, Download, Loader2 } from 'l
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Pagination } from '../../components/Pagination';
-import { useConnectionStore } from '../../stores';
+import { useConnectionStore, useTabStore } from '../../stores';
 import type { TopicInfo } from '../../types';
 import { useTranslation } from 'react-i18next';
 
@@ -193,6 +193,7 @@ function DeleteTopicDialog({
 export function TopicListPage() {
   const navigate = useNavigate();
   const { activeConnection } = useConnectionStore();
+  const { addTab } = useTabStore();
   const { t } = useTranslation();
   
   const [topics, setTopics] = useState<TopicInfo[]>([]);
@@ -418,16 +419,18 @@ export function TopicListPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/main/topics/${encodeURIComponent(topic.name)}/consume`)}
+                          onClick={() => activeConnection && addTab('consumer', topic.name, activeConnection)}
                           title={t('topics.consume')}
+                          disabled={!activeConnection}
                         >
                           <Download className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/main/topics/${encodeURIComponent(topic.name)}/produce`)}
+                          onClick={() => activeConnection && addTab('producer', topic.name, activeConnection)}
                           title={t('topics.produce')}
+                          disabled={!activeConnection}
                         >
                           <Send className="w-4 h-4" />
                         </Button>

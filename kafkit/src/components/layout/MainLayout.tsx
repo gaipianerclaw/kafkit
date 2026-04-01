@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   List, 
   Users, 
@@ -7,27 +7,41 @@ import {
   ChevronDown,
   Server
 } from 'lucide-react';
-import { useConnectionStore } from '../../stores';
+import { useConnectionStore, useTabStore } from '../../stores';
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import { QuickSearch } from '../QuickSearch';
-import { AlertCenter } from '../AlertCenter';
+// import { AlertCenter } from '../AlertCenter';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { TabBar } from '../TabBar';
+import { TabContent } from '../TabBar/TabContent';
+import { NewTabDialog } from '../TabBar/NewTabDialog';
 
 export function MainLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const { connections, activeConnection, fetchConnections, setActiveConnection } = useConnectionStore();
+  const { tabs } = useTabStore();
   const [showConnectionMenu, setShowConnectionMenu] = useState(false);
+  const [showNewTabDialog, setShowNewTabDialog] = useState(false);
 
   useEffect(() => {
     fetchConnections();
   }, []);
 
-  // 全局快捷键
+  // Check if we should show tabs or outlet
+  const isTopicsRoute = location.pathname === '/main/topics' || 
+                        location.pathname === '/main/topics/' ||
+                        location.pathname.startsWith('/main/topics/') && !location.pathname.includes('/consume') && !location.pathname.includes('/produce');
+  const isGroupsRoute = location.pathname === '/main/groups';
+  const isSettingsRoute = location.pathname === '/main/settings';
+  const isConnectionsRoute = location.pathname.startsWith('/main/connections');
+  const showTabs = !isTopicsRoute && !isGroupsRoute && !isSettingsRoute && !isConnectionsRoute;
+
+  // Global keyboard shortcuts
   const handleRefresh = useCallback(() => {
-    // 触发刷新事件，由各个页面监听
     window.dispatchEvent(new CustomEvent('kafkit:refresh'));
   }, []);
 
@@ -163,19 +177,33 @@ export function MainLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Header Toolbar */}
-        <div className="h-12 border-b border-border flex items-center justify-end px-4 gap-2">
-          <AlertCenter />
-        </div>
+        {/* Tab Bar - shown when there are tabs or when on a tab route */}
+        {(tabs.length > 0 || showTabs) && (
+          <TabBar onNewTab={() => setShowNewTabDialog(true)} />
+        )}
+        
+        {/* Content Area */}
         <div className="flex-1 overflow-hidden">
-          <Outlet />
+          {isTopicsRoute || isGroupsRoute || isSettingsRoute || isConnectionsRoute ? (
+            <Outlet />
+          ) : tabs.length > 0 ? (
+            <TabContent />
+          ) : (
+            <Outlet />
+          )}
         </div>
       </main>
       
-      {/* 快捷键帮助 */}
+      {/* New Tab Dialog */}
+      <NewTabDialog 
+        isOpen={showNewTabDialog} 
+        onClose={() => setShowNewTabDialog(false)} 
+      />
+      
+      {/* Keyboard Shortcuts Help */}
       <KeyboardShortcutsHelp />
       
-      {/* 快速搜索 */}
+      {/* Quick Search */}
       <QuickSearch />
     </div>
   );
