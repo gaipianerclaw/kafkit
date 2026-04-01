@@ -102,6 +102,8 @@ export interface ProduceMessage {
   value: string;
   headers?: Record<string, string>;
   compression?: 'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd';
+  /** Timestamp in milliseconds since epoch (optional) */
+  timestamp?: number;
 }
 
 export interface ProduceResult {

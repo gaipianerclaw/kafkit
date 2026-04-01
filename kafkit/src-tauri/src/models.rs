@@ -196,6 +196,9 @@ pub struct ProduceMessage {
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
+    /// Timestamp in milliseconds since epoch (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

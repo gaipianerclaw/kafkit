@@ -33,6 +33,41 @@ export interface ColumnMapping {
   useFilePartition: boolean;
 }
 
+/** Timestamp mode types */
+export type TimestampMode = 'file' | 'current' | 'fixed' | 'offset';
+
+/** Timestamp configuration */
+export interface TimestampConfig {
+  /** Timestamp mode */
+  mode: TimestampMode;
+  /** 
+   * Fixed timestamp value (for 'fixed' mode)
+   * Can be ISO string or Unix timestamp (ms)
+   */
+  fixedValue?: string | number;
+  /**
+   * Offset in milliseconds (for 'offset' mode)
+   * Positive = add to original timestamp, Negative = subtract
+   */
+  offsetMs?: number;
+}
+
+/** Value timestamp field configuration */
+export interface ValueTimestampConfig {
+  /** Whether to modify timestamp in value */
+  enabled: boolean;
+  /** JSON path to timestamp field (e.g., 'timestamp', 'data.ts') */
+  fieldPath: string;
+  /** Detected timestamp format */
+  format: 'unix_ms' | 'unix_sec' | 'iso8601' | 'unknown';
+  /** Timestamp modification mode */
+  mode: TimestampMode;
+  /** Fixed timestamp value (for 'fixed' mode) */
+  fixedValue?: string | number;
+  /** Offset in milliseconds (for 'offset' mode) */
+  offsetMs?: number;
+}
+
 /** Sending strategy types */
 export type StrategyType = 'immediate' | 'tps' | 'interval' | 'cron';
 

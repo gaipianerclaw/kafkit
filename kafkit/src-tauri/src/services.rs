@@ -789,6 +789,11 @@ impl ConnectionManager {
             record = record.partition(partition);
         }
         
+        // 设置 timestamp（如果有）
+        if let Some(timestamp) = message.timestamp {
+            record = record.timestamp(timestamp);
+        }
+        
         // 发送消息
         let delivery = producer.send(
             record,
@@ -839,6 +844,11 @@ impl ConnectionManager {
             
             if let Some(partition) = message.partition {
                 record = record.partition(partition);
+            }
+            
+            // 设置 timestamp（如果有）
+            if let Some(timestamp) = message.timestamp {
+                record = record.timestamp(timestamp);
             }
             
             // 发送消息
