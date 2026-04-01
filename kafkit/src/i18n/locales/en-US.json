@@ -174,7 +174,7 @@
     "singleMode": "Single",
     "batchMode": "Batch",
     "scheduledMode": "Scheduled",
-    "scriptMode": "Script",
+    "fileModeTab": "File Import",
     "format": "Message Format",
     "formats": {
       "text": "Plain Text",
@@ -207,121 +207,98 @@
     "failed": "Send failed",
     "scheduledProgress": "Progress: {current}/{total} | Success: {success} | Failed: {failed}",
     "scheduledComplete": "Send complete! Total: {total} | Success: {success} | Failed: {failed}",
-    "script": {
-      "title": "Script Mode",
-      "editor": "JavaScript Editor",
-      "preview": "Preview",
-      "templates": "Templates",
-      "keyStrategy": "Key Strategy",
-      "sendStrategy": "Sending Strategy",
-      "monitor": "Monitor",
-      "start": "Start",
-      "pause": "Pause",
-      "resume": "Resume",
-      "stop": "Stop",
-      "strategies": {
-        "immediate": {
-          "title": "Immediate",
-          "desc": "Send once immediately"
-        },
-        "tps": {
-          "title": "TPS Control",
-          "desc": "Rate limited sending"
-        },
-        "interval": {
-          "title": "Interval",
-          "desc": "Fixed delay"
-        },
-        "cron": {
-          "title": "Cron",
-          "desc": "Scheduled execution"
-        }
+    "fileMode": {
+      "title": "File Import Mode",
+      "send": "Start Sending",
+      "continue": "Continue",
+      "resend": "Resend",
+      "fileSize": "File Size",
+      "largeFileWarning": "Large File",
+      "parsing": "Parsing",
+      "upload": {
+        "title": "File Upload",
+        "format": "File Format",
+        "formatAuto": "Auto-detect",
+        "formatJson": "JSON Array",
+        "formatJsonl": "JSON Lines",
+        "formatCsv": "CSV",
+        "detected": "Detected",
+        "dragDrop": "Drag and drop file here, or click to select",
+        "clickToSelect": "Supports .json, .jsonl, .csv, .txt formats"
       },
-      "keyStrategies": {
-        "roundrobin": {
-          "title": "Round Robin",
-          "desc": "Cycle through partitions"
-        },
-        "random": {
-          "title": "Random",
-          "desc": "Random partition selection"
-        },
-        "fixed": {
-          "title": "Fixed Key",
-          "desc": "Use a constant key value"
-        },
-        "hash": {
-          "title": "Hash",
-          "desc": "Hash-based distribution"
-        },
-        "custom": {
-          "title": "Custom Script",
-          "desc": "Define your own key logic"
-        }
+      "preview": {
+        "title": "Message Preview",
+        "showing": "Showing first {count} messages (of {total})",
+        "key": "Key",
+        "value": "Value",
+        "headers": "Headers",
+        "errors": "errors",
+        "moreErrors": "{count} more errors",
+        "formatHint": "Format Hint",
+        "csvHint": "CSV: First row is treated as headers. Configure Key/Value mapping below.",
+        "jsonlHint": "JSON Lines: One JSON object per line. Supports Consumer export format.",
+        "jsonHint": "JSON Array: Standard JSON array format, each element is a message"
       },
-      "fields": {
-        "targetTPS": "Target TPS",
-        "interval": "Interval (ms)",
-        "cronExpression": "Cron Expression",
-        "maxMessages": "Max Messages",
-        "maxDuration": "Max Duration (min)",
-        "unlimited": "0 = unlimited"
+      "mapping": {
+        "title": "Column Mapping (CSV)",
+        "keyColumn": "Key Column",
+        "keyColumnHint": "Select the column containing Kafka message key",
+        "valueColumn": "Value Column",
+        "valueColumnHint": "Select the column containing message content, leave empty to use entire row",
+        "headerColumn": "Headers Column",
+        "headerColumnHint": "Select the column containing message headers (JSON format)",
+        "partitionColumn": "Partition Column",
+        "partitionColumnHint": "Select the column containing target partition number, leave empty for auto",
+        "none": "None",
+        "useAllColumns": "Use all columns",
+        "auto": "Auto"
       },
-      "templateCategories": {
-        "iot": "IoT & Sensors",
-        "ecommerce": "E-commerce",
-        "log": "Logs & Events",
-        "finance": "Finance",
-        "social": "Social Media",
-        "system": "System Metrics"
+      "partition": {
+        "title": "Partition Settings",
+        "useFilePartition": "Use Partition from File",
+        "useFilePartitionHint": "When enabled, messages will be sent to the partition specified in the file. When disabled, auto partition is used (default)",
+        "column": "Partition Column (CSV)"
       },
-      "templates": {
-        "iotSensor": {
-          "name": "IoT Sensor Data",
-          "desc": "Simulate temperature, humidity, and pressure sensors"
-        },
-        "ecommerceOrder": {
-          "name": "E-commerce Orders",
-          "desc": "Simulate order lifecycle events (created, paid, shipped)"
-        },
-        "logStream": {
-          "name": "Application Logs",
-          "desc": "Generate structured application log entries"
-        },
-        "stockTicker": {
-          "name": "Stock Market Ticker",
-          "desc": "Real-time stock price updates with volume"
-        },
-        "userActivity": {
-          "name": "User Activity Events",
-          "desc": "Track user interactions and page views"
-        },
-        "metricStream": {
-          "name": "System Metrics",
-          "desc": "CPU, memory, and disk usage metrics"
-        },
-        "socialFeed": {
-          "name": "Social Media Posts",
-          "desc": "User posts, likes, and comments"
-        },
-        "transaction": {
-          "name": "Financial Transactions",
-          "desc": "Payment and transfer transactions"
-        }
+      "strategy": {
+        "title": "Sending Strategy",
+        "immediate": "Immediate",
+        "immediateDesc": "Send all messages as fast as possible",
+        "immediateNote": "Messages will be sent sequentially",
+        "tps": "TPS Control",
+        "tpsDesc": "Control messages per second",
+        "tpsLabel": "Target TPS",
+        "tpsUnit": "msg/sec",
+        "interval": "Fixed Interval",
+        "intervalDesc": "Send with fixed delay between messages",
+        "intervalLabel": "Send Interval",
+        "intervalUnit": "seconds"
       },
-      "stats": {
+      "compression": {
+        "title": "Compression",
+        "none": "None",
+        "gzip": "GZIP",
+        "snappy": "Snappy",
+        "lz4": "LZ4",
+        "zstd": "ZSTD",
+        "hint": "Select Kafka message compression algorithm. Compression reduces network traffic and storage, but increases CPU usage."
+      },
+      "progress": {
+        "title": "Send Progress",
+        "completed": "Completed",
+        "sending": "Sending...",
+        "paused": "Paused",
         "sent": "Sent",
-        "success": "Success",
         "failed": "Failed",
-        "currentTPS": "Current TPS",
-        "duration": "Duration"
+        "remaining": "Remaining",
+        "cancel": "Cancel Sending",
+        "error": "Send Error",
+        "allSent": "All messages sent successfully!"
       },
-      "previewPanel": {
-        "emptyTitle": "Preview",
-        "emptyDesc": "Switch to Preview tab to see generated results",
-        "generatedMsg": "Generated message preview",
-        "generatedCount": "Generated {count} messages",
-        "error": "Error"
+      "errors": {
+        "parseFailed": "Parse failed: {error}",
+        "parseFailedTitle": "File Parse Failed",
+        "moreErrors": "{count} more errors",
+        "invalidFormat": "Invalid file format"
       }
     }
   },
@@ -408,7 +385,9 @@
       "memoryWarning": "Too many messages",
       "memoryWarningDesc": "Currently loaded {count} messages. Continuing may cause out of memory. Consider exporting to file.",
       "largeMessageWarning": "Message too large",
-      "largeMessageWarningDesc": "Single message exceeds {size}KB, truncated for display. Export to view full content."
+      "largeMessageWarningDesc": "Single message exceeds {size}KB, truncated for display. Export to view full content.",
+      "loadingTopicInfo": "Loading topic info, please try again later",
+      "topicInfoFailed": "Failed to load topic info, please refresh the page"
     },
     "searchPlaceholder": "Search in messages...",
     "searchFields": {
@@ -625,12 +604,6 @@
       "topic_growth": "Topic Growth",
       "produce_error": "Produce Error",
       "consume_error": "Consume Error"
-    }
-  },
-  "consumer": {
-    "alerts": {
-      "loadingTopicInfo": "Loading topic info, please try again later",
-      "topicInfoFailed": "Failed to load topic info, please refresh the page"
     }
   }
 }

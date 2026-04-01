@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Send, FileJson, Clock, Code } from 'lucide-react';
+import { ArrowLeft, Send, FileJson, Clock, FileUp } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { SingleMode } from './SingleMode';
 import { BatchMode } from './BatchMode';
 import { ScheduledMode } from './ScheduledMode';
-import { ScriptMode } from './ScriptMode';
+import { FileMode } from './FileMode';
 
 export function ProducerPage() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export function ProducerPage() {
   const { activeConnection } = useConnectionStore();
   const { t } = useTranslation();
   
-  const [mode, setMode] = useState<'single' | 'batch' | 'scheduled' | 'script'>('single');
+  const [mode, setMode] = useState<'single' | 'batch' | 'scheduled' | 'file'>('single');
   const [format, setFormat] = useState<'json' | 'text' | 'csv'>('text');
 
   const decodedTopic = topic ? decodeURIComponent(topic) : '';
@@ -49,8 +49,8 @@ export function ProducerPage() {
           <h1 className="text-lg font-semibold">{t('producer.title')}: {decodedTopic}</h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Format Selector (hide in script mode) */}
-          {mode !== 'script' && (
+          {/* Format Selector (hide in file mode) */}
+          {mode !== 'file' && (
             <Select
               value={format}
               onChange={e => setFormat(e.target.value as typeof format)}
@@ -93,13 +93,13 @@ export function ProducerPage() {
               {t('producer.scheduledMode')}
             </button>
             <button
-              onClick={() => setMode('script')}
+              onClick={() => setMode('file')}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${
-                mode === 'script' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                mode === 'file' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Code className="w-3.5 h-3.5" />
-              {t('producer.scriptMode')}
+              <FileUp className="w-3.5 h-3.5" />
+              {t('producer.fileModeTab')}
             </button>
           </div>
         </div>
@@ -129,8 +129,8 @@ export function ProducerPage() {
               format={format}
             />
           )}
-          {mode === 'script' && (
-            <ScriptMode 
+          {mode === 'file' && (
+            <FileMode 
               connection={activeConnection} 
               topic={decodedTopic}
             />

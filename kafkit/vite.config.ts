@@ -1,14 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 
 export default defineConfig(async () => ({
   plugins: [
     react(),
-    wasm(),
-    topLevelAwait(),
     {
       name: "html-transform",
       transformIndexHtml(html) {
@@ -30,10 +26,6 @@ export default defineConfig(async () => ({
     watch: {
       ignored: ["**/src-tauri/**"],
     },
-    headers: {
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
   },
   build: {
     assetsDir: "assets",
@@ -46,7 +38,4 @@ export default defineConfig(async () => ({
     },
   },
   base: "./",
-  optimizeDeps: {
-    exclude: ["quickjs-emscripten", "@jitl/quickjs-wasmfile-release-sync"],
-  },
 }));

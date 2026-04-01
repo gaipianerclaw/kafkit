@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 mod commands;
 mod connection_pool;
@@ -42,6 +42,27 @@ pub fn run() {
                 config_store,
             });
             
+            // Setup file drop handler for the main window
+            if let Some(window) = app.get_webview_window("main") {
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::DragDrop(event) = event {
+                        match event {
+                            tauri::DragDropEvent::Drop { paths, .. } => {
+                                let paths_vec: Vec<String> = paths.iter()
+                                    .map(|p: &std::path::PathBuf| p.to_string_lossy().to_string())
+                                    .collect();
+                                let _ = window_clone.emit("tauri://file-drop", paths_vec);
+                            }
+                            tauri::DragDropEvent::Leave => {
+                                let _ = window_clone.emit("tauri://file-drop-cancelled", ());
+                            }
+                            _ => {}
+                        }
+                    }
+                });
+            }
+            
             // 开发模式下可通过快捷键手动打开开发者工具 (Cmd+Option+I on macOS, Ctrl+Shift+I on Windows/Linux)
             // 如需自动打开，取消下面注释：
             // #[cfg(debug_assertions)]
@@ -82,6 +103,7 @@ pub fn run() {
             get_consumer_lag,
             reset_consumer_offset,
             // File
+            read_file,
             save_to_file,
             append_to_file,
         ])

@@ -1,0 +1,76 @@
+/**
+ * File Mode - Type definitions
+ */
+
+/** Supported file formats */
+export type FileFormat = 'auto' | 'json' | 'jsonl' | 'csv';
+
+/** Parsed message structure */
+export interface ParsedMessage {
+  /** Message key (optional) */
+  key?: string;
+  /** Message value (required) */
+  value: string | object;
+  /** Message headers */
+  headers?: Record<string, string>;
+  /** Target partition (optional) */
+  partition?: number;
+  /** Raw data for CSV mapping */
+  _raw?: Record<string, any>;
+}
+
+/** Column mapping for CSV files */
+export interface ColumnMapping {
+  /** Column containing the message key */
+  keyColumn: string;
+  /** Column containing the message value */
+  valueColumn: string;
+  /** Column containing headers (JSON string) */
+  headerColumn: string;
+  /** Column containing partition number */
+  partitionColumn: string;
+  /** Whether to use partition from file (default: false) */
+  useFilePartition: boolean;
+}
+
+/** Sending strategy types */
+export type StrategyType = 'immediate' | 'tps' | 'interval' | 'cron';
+
+/** Sending strategy configuration */
+export interface SendingStrategy {
+  type: StrategyType;
+  config: {
+    /** TPS rate (for tps strategy) */
+    tps?: number;
+    /** Interval in seconds (for interval strategy) */
+    intervalSeconds?: number;
+    /** Cron expression (for cron strategy) */
+    cronExpression?: string;
+    /** Start time (for cron strategy) */
+    startTime?: string;
+    /** End time (for cron strategy) */
+    endTime?: string;
+  };
+}
+
+/** File parsing result */
+export interface ParseResult {
+  /** Parsed messages */
+  messages: ParsedMessage[];
+  /** Validation errors */
+  errors: string[];
+  /** Total line count */
+  totalLines: number;
+}
+
+/** Progress state */
+export interface SendProgress {
+  /** Total messages to send */
+  total: number;
+  /** Successfully sent */
+  sent: number;
+  /** Failed to send */
+  failed: number;
+  /** Current position */
+  current: number;
+}

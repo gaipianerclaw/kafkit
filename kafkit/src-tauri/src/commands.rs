@@ -419,6 +419,15 @@ pub async fn reset_consumer_offset(
 }
 
 #[tauri::command]
+pub async fn read_file(
+    file_path: String,
+) -> Result<Vec<u8>> {
+    println!("[Kafkit] Reading file: {}", file_path);
+    std::fs::read(&file_path)
+        .map_err(|e| AppError::Other(format!("Failed to read file: {}", e)))
+}
+
+#[tauri::command]
 pub async fn save_to_file(
     file_path: String,
     content: String,

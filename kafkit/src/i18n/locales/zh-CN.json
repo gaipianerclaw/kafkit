@@ -174,7 +174,7 @@
     "singleMode": "单条",
     "batchMode": "批量",
     "scheduledMode": "定时",
-    "scriptMode": "脚本",
+    "fileModeTab": "文件导入",
     "format": "消息格式",
     "formats": {
       "text": "纯文本",
@@ -207,121 +207,98 @@
     "failed": "发送失败",
     "scheduledProgress": "进度: {current}/{total} | 成功: {success} | 失败: {failed}",
     "scheduledComplete": "发送完成! 总计: {total} | 成功: {success} | 失败: {failed}",
-    "script": {
-      "title": "脚本模式",
-      "editor": "JavaScript 编辑器",
-      "preview": "预览",
-      "templates": "模板",
-      "keyStrategy": "Key 策略",
-      "sendStrategy": "发送策略",
-      "monitor": "监控",
-      "start": "开始",
-      "pause": "暂停",
-      "resume": "继续",
-      "stop": "停止",
-      "strategies": {
-        "immediate": {
-          "title": "即时发送",
-          "desc": "立即执行一次"
-        },
-        "tps": {
-          "title": "TPS 控制",
-          "desc": "控制发送速率"
-        },
-        "interval": {
-          "title": "固定间隔",
-          "desc": "定时发送"
-        },
-        "cron": {
-          "title": "Cron 定时",
-          "desc": "按计划执行"
-        }
+    "fileMode": {
+      "title": "文件导入模式",
+      "send": "开始发送",
+      "continue": "继续发送",
+      "resend": "重新发送",
+      "fileSize": "文件大小",
+      "largeFileWarning": "大文件",
+      "parsing": "解析中",
+      "upload": {
+        "title": "文件上传",
+        "format": "文件格式",
+        "formatAuto": "自动检测",
+        "formatJson": "JSON 数组",
+        "formatJsonl": "JSON Lines",
+        "formatCsv": "CSV",
+        "detected": "检测到",
+        "dragDrop": "拖放文件到此处，或点击选择文件",
+        "clickToSelect": "支持 .json, .jsonl, .csv, .txt 格式"
       },
-      "keyStrategies": {
-        "roundrobin": {
-          "title": "轮询",
-          "desc": "轮流选择分区"
-        },
-        "random": {
-          "title": "随机",
-          "desc": "随机选择分区"
-        },
-        "fixed": {
-          "title": "固定 Key",
-          "desc": "使用固定 Key 值"
-        },
-        "hash": {
-          "title": "哈希",
-          "desc": "基于哈希分布"
-        },
-        "custom": {
-          "title": "自定义脚本",
-          "desc": "自定义 Key 生成逻辑"
-        }
+      "preview": {
+        "title": "消息预览",
+        "showing": "显示前 {count} 条消息 (共 {total} 条)",
+        "key": "Key",
+        "value": "Value",
+        "headers": "Headers",
+        "errors": "个错误",
+        "moreErrors": "还有 {count} 个错误",
+        "formatHint": "格式提示",
+        "csvHint": "CSV 文件：第一行将被识别为表头，可通过列映射配置 Key/Value",
+        "jsonlHint": "JSON Lines：每行一条 JSON 消息，支持从 Consumer 导出的格式",
+        "jsonHint": "JSON 数组：标准 JSON 数组格式，每个元素为一条消息"
       },
-      "fields": {
-        "targetTPS": "目标 TPS",
-        "interval": "间隔 (毫秒)",
-        "cronExpression": "Cron 表达式",
-        "maxMessages": "最大消息数",
-        "maxDuration": "最大时长 (分钟)",
-        "unlimited": "0 = 无限制"
+      "mapping": {
+        "title": "列映射 (CSV)",
+        "keyColumn": "Key 列",
+        "keyColumnHint": "选择包含 Kafka message key 的列",
+        "valueColumn": "Value 列",
+        "valueColumnHint": "选择包含消息内容的列，留空则使用整行数据",
+        "headerColumn": "Headers 列",
+        "headerColumnHint": "选择包含消息 headers 的列 (JSON 格式)",
+        "partitionColumn": "Partition 列",
+        "partitionColumnHint": "选择包含目标分区号的列，留空则自动分配",
+        "none": "无",
+        "useAllColumns": "使用所有列",
+        "auto": "自动"
       },
-      "templateCategories": {
-        "iot": "IoT & 传感器",
-        "ecommerce": "电商",
-        "log": "日志 & 事件",
-        "finance": "金融",
-        "social": "社交媒体",
-        "system": "系统指标"
+      "partition": {
+        "title": "Partition 设置",
+        "useFilePartition": "使用文件中的 Partition",
+        "useFilePartitionHint": "开启后将按照文件中记录的 Partition 发送消息，关闭则使用自动分区（默认）",
+        "column": "Partition 列 (CSV)"
       },
-      "templates": {
-        "iotSensor": {
-          "name": "IoT 传感器数据",
-          "desc": "模拟温度、湿度和压力传感器数据"
-        },
-        "ecommerceOrder": {
-          "name": "电商订单",
-          "desc": "模拟订单生命周期事件（创建、支付、发货）"
-        },
-        "logStream": {
-          "name": "应用日志",
-          "desc": "生成结构化应用日志条目"
-        },
-        "stockTicker": {
-          "name": "股票行情",
-          "desc": "实时股票价格更新和交易量"
-        },
-        "userActivity": {
-          "name": "用户行为",
-          "desc": "用户交互和页面浏览追踪"
-        },
-        "metricStream": {
-          "name": "系统指标",
-          "desc": "CPU、内存和磁盘使用指标"
-        },
-        "socialFeed": {
-          "name": "社交媒体",
-          "desc": "用户帖子、点赞和评论"
-        },
-        "transaction": {
-          "name": "金融交易",
-          "desc": "支付和转账交易"
-        }
+      "strategy": {
+        "title": "发送策略",
+        "immediate": "立即发送",
+        "immediateDesc": "尽快发送所有消息",
+        "immediateNote": "消息将按顺序立即发送",
+        "tps": "TPS 控制",
+        "tpsDesc": "控制每秒发送的消息数",
+        "tpsLabel": "目标 TPS",
+        "tpsUnit": "条/秒",
+        "interval": "固定间隔",
+        "intervalDesc": "每条消息间隔固定时间发送",
+        "intervalLabel": "发送间隔",
+        "intervalUnit": "秒"
       },
-      "stats": {
+      "compression": {
+        "title": "压缩算法",
+        "none": "无压缩",
+        "gzip": "GZIP",
+        "snappy": "Snappy",
+        "lz4": "LZ4",
+        "zstd": "ZSTD",
+        "hint": "选择 Kafka 消息的压缩算法，默认无压缩。压缩可减少网络传输和存储空间，但会增加 CPU 开销。"
+      },
+      "progress": {
+        "title": "发送进度",
+        "completed": "已完成",
+        "sending": "发送中...",
+        "paused": "已暂停",
         "sent": "已发送",
-        "success": "成功",
         "failed": "失败",
-        "currentTPS": "当前 TPS",
-        "duration": "运行时长"
+        "remaining": "剩余",
+        "cancel": "取消发送",
+        "error": "发送错误",
+        "allSent": "所有消息发送完成！"
       },
-      "previewPanel": {
-        "emptyTitle": "预览",
-        "emptyDesc": "切换到预览标签查看生成结果",
-        "generatedMsg": "生成消息预览",
-        "generatedCount": "生成了 {count} 条消息",
-        "error": "错误"
+      "errors": {
+        "parseFailed": "解析失败: {error}",
+        "parseFailedTitle": "文件解析失败",
+        "moreErrors": "还有 {count} 个错误",
+        "invalidFormat": "无效的文件格式"
       }
     }
   },
@@ -408,7 +385,9 @@
       "memoryWarning": "消息数量过多",
       "memoryWarningDesc": "当前已加载 {count} 条消息，继续加载可能导致内存不足。建议导出到文件查看。",
       "largeMessageWarning": "消息体积过大",
-      "largeMessageWarningDesc": "单条消息超过 {size}KB，已截断显示。完整内容请导出查看。"
+      "largeMessageWarningDesc": "单条消息超过 {size}KB，已截断显示。完整内容请导出查看。",
+      "loadingTopicInfo": "正在加载 Topic 信息，请稍后再试",
+      "topicInfoFailed": "Topic 信息加载失败，请刷新页面重试"
     },
     "searchPlaceholder": "搜索消息内容...",
     "searchFields": {
@@ -625,12 +604,6 @@
       "topic_growth": "Topic 增长",
       "produce_error": "生产错误",
       "consume_error": "消费错误"
-    }
-  },
-  "consumer": {
-    "alerts": {
-      "loadingTopicInfo": "正在加载 Topic 信息，请稍后再试",
-      "topicInfoFailed": "Topic 信息加载失败，请刷新页面重试"
     }
   }
 }

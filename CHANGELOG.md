@@ -1,5 +1,44 @@
 # 更新日志
 
+## v1.0.5 (2026-03-31)
+
+### ✨ 新增功能
+
+#### Producer File Mode（文件导入发送）
+- **文件拖拽上传**: 支持拖拽文件到上传区域，自动识别文件格式
+- **多格式支持**: JSON Array、JSON Lines、CSV/TSV 格式
+- **字段映射**: CSV 格式自动检测列，支持 key/value/partition/headers 映射
+- **Partition 策略**: 可选择使用文件中的 partition 或自动分配
+- **发送策略**: 即时发送、TPS 控制、固定间隔三种模式
+- **进度监控**: 实时显示发送进度，支持取消、继续、重新发送
+- **压缩支持**: File Mode 支持 gzip/snappy/lz4/zstd 压缩
+- **大文件处理**: 流式处理大文件（>100MB），分块读取避免内存溢出
+
+#### 文件解析增强
+- **CSV 解析修复**: 正确识别消费者导出的 CSV 文件 header 和 value 列
+- **流式解析**: 使用 AsyncGenerator 处理大文件，预览只读取前 100 行
+- **错误处理**: 解析失败时显示详细错误信息
+
+### 🐛 Bug 修复
+
+- **修复 CSV 导入问题**: 正确解析消费者页面导出的 CSV 文件，识别 key/value 列
+- **修复文件拖拽**: Tauri 桌面应用支持文件拖拽上传
+- **修复进度计算**: 避免负数剩余、超过100%进度的问题
+
+### 🔧 技术改进
+
+- **新增 Hook**: `useTauriFileDrop` - Tauri 文件拖拽事件处理
+- **新增 Rust 命令**: `read_file` - 读取本地文件内容
+- **流式文件解析**: `streamFileParser.ts` - 支持大文件分块读取
+- **测试覆盖**: 新增 14 个 File Mode 相关测试
+
+### 🗑️ 移除内容
+
+- **Script Mode 移除**: 因复杂度高、调试困难，移除脚本模式
+- **移除依赖**: quickjs-emscripten、monaco-editor、cron-parser、uuid
+
+---
+
 ## v1.0.3 (2026-03-26)
 
 ### 🚀 性能优化

@@ -101,6 +101,7 @@ export interface ProduceMessage {
   key?: string;
   value: string;
   headers?: Record<string, string>;
+  compression?: 'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd';
 }
 
 export interface ProduceResult {
