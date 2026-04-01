@@ -230,8 +230,26 @@ const CsvRenderer = ({ data }: { data: string }) => {
     return result;
   };
   
-  const headers = parseCsvLine(lines[0]);
-  const rows = lines.slice(1).map(parseCsvLine);
+  // 检测是否为 CSV 记录格式（单行或没有明显 header 的数据）
+  // 如果是 Kafka 消息 value 中的 CSV 数据，通常只有一行记录，没有 header
+  const isSingleLine = lines.length === 1;
+  
+  // 对于单行数据，直接使用列索引作为标题
+  // 对于多行数据，尝试检测是否有 header（基于第一行是否符合字段名格式）
+  const firstRow = parseCsvLine(lines[0]);
+  const hasHeader = !isSingleLine && lines.length > 1 && (() => {
+    // 简单判断：如果第一行每个单元格看起来像字段名（标识符格式或中文）
+    const firstRowLooksLikeHeader = firstRow.every(cell => 
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cell) || // 标识符格式
+      /^[\u4e00-\u9fa5]+$/.test(cell) // 中文字段名
+    );
+    return firstRowLooksLikeHeader;
+  })();
+  
+  const headers = hasHeader ? firstRow : firstRow.map((_, i) => `Col ${i + 1}`);
+  const rows = hasHeader 
+    ? lines.slice(1).map(parseCsvLine)
+    : lines.map(parseCsvLine);
   
   return (
     <div className="overflow-x-auto">
@@ -239,7 +257,7 @@ const CsvRenderer = ({ data }: { data: string }) => {
         <thead>
           <tr className="border-b border-border">
             {headers.map((h, i) => (
-              <th key={i} className="text-left py-1 px-2 font-medium text-muted-foreground bg-muted/50">
+              <th key={i} className={`text-left py-1 px-2 font-medium text-muted-foreground bg-muted/50 ${!hasHeader ? 'text-xs' : ''}`}>
                 {h}
               </th>
             ))}
