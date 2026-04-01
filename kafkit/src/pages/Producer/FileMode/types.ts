@@ -59,7 +59,12 @@ export interface ValueTimestampConfig {
   /** JSON path to timestamp field (e.g., 'timestamp', 'data.ts') */
   fieldPath: string;
   /** Detected timestamp format */
-  format: 'unix_ms' | 'unix_sec' | 'iso8601' | 'unknown';
+  format: 'unix_ms' | 'unix_sec' | 'iso8601' | 'iso8601_space' | 'unknown';
+  /** 
+   * Original timestamp format pattern for formatting output
+   * e.g., 'yyyy-MM-dd HH:mm:ss.SSS' for CSV datetime format
+   */
+  originalFormat?: string;
   /** Timestamp modification mode */
   mode: TimestampMode;
   /** Fixed timestamp value (for 'fixed' mode) */

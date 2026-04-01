@@ -17,7 +17,7 @@ interface ValueTimestampMapperProps {
 
 interface DetectedField {
   path: string;
-  format: 'unix_ms' | 'unix_sec' | 'iso8601' | 'unknown';
+  format: 'unix_ms' | 'unix_sec' | 'iso8601' | 'iso8601_space' | 'unknown';
   sampleValue: string;
 }
 
@@ -39,16 +39,92 @@ export function ValueTimestampMapper({
     for (const msg of previewMessages.slice(0, 5)) {
       const value = typeof msg.value === 'string' ? msg.value : JSON.stringify(msg.value);
       
+      // Try JSON first
       try {
         const obj = JSON.parse(value);
         findTimestampFields(obj, '', fields);
+        continue;
       } catch {
-        // Not valid JSON, skip
+        // Not valid JSON, try CSV
+      }
+      
+      // Try CSV format: detect timestamp patterns in comma-separated values
+      const csvField = detectCsvTimestamp(value);
+      if (csvField) {
+        fields.set(csvField.path, csvField);
       }
     }
 
     return Array.from(fields.values());
   }, [previewMessages]);
+  
+  // Detect timestamp in CSV format value
+  const detectCsvTimestamp = (value: string): DetectedField | null => {
+    const parts = value.split(',');
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      
+      // Check for datetime pattern with space separator: yyyy-MM-dd HH:mm:ss.SSS
+      // This is the common CSV format
+      const spaceDatePattern = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)$/;
+      if (spaceDatePattern.test(part)) {
+        const date = new Date(part.replace(' ', 'T'));
+        if (!isNaN(date.getTime())) {
+          return {
+            path: `csv_column_${i}`,
+            format: 'iso8601_space',
+            sampleValue: part,
+          };
+        }
+      }
+      
+      // Check for ISO 8601 format with T separator: yyyy-MM-ddTHH:mm:ss.SSS
+      const isoPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z?)$/;
+      if (isoPattern.test(part)) {
+        const date = new Date(part);
+        if (!isNaN(date.getTime())) {
+          return {
+            path: `csv_column_${i}`,
+            format: 'iso8601',
+            sampleValue: part,
+          };
+        }
+      }
+      
+      // Check for Unix timestamp (ms) - 13 digits
+      if (/^\d{13}$/.test(part)) {
+        const ts = parseInt(part, 10);
+        const now = Date.now();
+        const tenYearsAgo = now - 10 * 365 * 24 * 60 * 60 * 1000;
+        const tenYearsFromNow = now + 10 * 365 * 24 * 60 * 60 * 1000;
+        if (ts > tenYearsAgo && ts < tenYearsFromNow) {
+          return {
+            path: `csv_column_${i}`,
+            format: 'unix_ms',
+            sampleValue: part,
+          };
+        }
+      }
+      
+      // Check for Unix timestamp (sec) - 10 digits
+      if (/^\d{10}$/.test(part)) {
+        const ts = parseInt(part, 10) * 1000;
+        const now = Date.now();
+        const tenYearsAgo = now - 10 * 365 * 24 * 60 * 60 * 1000;
+        const tenYearsFromNow = now + 10 * 365 * 24 * 60 * 60 * 1000;
+        if (ts > tenYearsAgo && ts < tenYearsFromNow) {
+          return {
+            path: `csv_column_${i}`,
+            format: 'unix_sec',
+            sampleValue: part,
+          };
+        }
+      }
+    }
+    
+    return null;
+  };
 
   // Recursively find timestamp fields in object
   const findTimestampFields = (
@@ -159,6 +235,13 @@ export function ValueTimestampMapper({
   const generatePreview = useCallback((originalValue: string): string => {
     if (!config.enabled || !config.fieldPath) return originalValue;
 
+    // Handle CSV column path
+    if (config.fieldPath.startsWith('csv_column_')) {
+      const modified = modifyTimestamp(null, config.fieldPath, config, originalValue);
+      return String(modified);
+    }
+
+    // Handle JSON path
     try {
       const obj = JSON.parse(originalValue);
       const modified = modifyTimestamp(obj, config.fieldPath, config);
@@ -168,8 +251,24 @@ export function ValueTimestampMapper({
     }
   }, [config]);
 
-  // Modify timestamp in object
-  const modifyTimestamp = (obj: any, path: string, cfg: ValueTimestampConfig): any => {
+  // Modify timestamp in object or CSV
+  const modifyTimestamp = (obj: any, path: string, cfg: ValueTimestampConfig, originalValue?: string): any => {
+    // Handle CSV column path (e.g., "csv_column_1")
+    if (path.startsWith('csv_column_')) {
+      if (!originalValue) return obj;
+      
+      const columnIndex = parseInt(path.replace('csv_column_', ''), 10);
+      const parts = originalValue.split(',');
+      
+      if (columnIndex >= 0 && columnIndex < parts.length) {
+        const newTimestamp = calculateNewTimestamp(parts[columnIndex].trim(), cfg);
+        parts[columnIndex] = String(newTimestamp);
+        return parts.join(',');
+      }
+      return originalValue;
+    }
+    
+    // Handle JSON object path
     const parts = path.split('.');
     const newObj = { ...obj };
     let current: any = newObj;
@@ -182,8 +281,8 @@ export function ValueTimestampMapper({
     }
 
     const lastKey = parts[parts.length - 1];
-    const originalValue = current[lastKey];
-    current[lastKey] = calculateNewTimestamp(originalValue, cfg);
+    const originalTimestamp = current[lastKey];
+    current[lastKey] = calculateNewTimestamp(originalTimestamp, cfg);
 
     return newObj;
   };
@@ -233,9 +332,22 @@ export function ValueTimestampMapper({
         return Math.floor(newMs / 1000);
       case 'iso8601':
         return new Date(newMs).toISOString();
+      case 'iso8601_space':
+        // Format as yyyy-MM-dd HH:mm:ss.SSS (preserve original CSV format)
+        return formatDateWithSpace(newMs);
       default:
         return newMs;
     }
+  };
+  
+  // Format date as yyyy-MM-dd HH:mm:ss.SSS
+  const formatDateWithSpace = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const padMs = (n: number) => String(n).padStart(3, '0');
+    
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+           `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${padMs(date.getMilliseconds())}`;
   };
 
   // Get first message for preview
@@ -295,31 +407,39 @@ export function ValueTimestampMapper({
 
             {detectedFields.length > 0 ? (
               <div className="space-y-1">
-                {detectedFields.map((field) => (
-                  <button
-                    key={field.path}
-                    onClick={() => !disabled && handleFieldPathChange(field.path)}
-                    disabled={disabled}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md border transition-colors ${
-                      config.fieldPath === field.path
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'bg-background border-border hover:bg-muted'
-                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {config.fieldPath === field.path && <Check className="w-4 h-4" />}
-                      <code className="text-xs">{field.path}</code>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="px-1.5 py-0.5 bg-muted rounded">
-                        {field.format === 'unix_ms' && 'Unix MS'}
-                        {field.format === 'unix_sec' && 'Unix Sec'}
-                        {field.format === 'iso8601' && 'ISO 8601'}
-                      </span>
-                      <span className="max-w-[100px] truncate">{field.sampleValue}</span>
-                    </div>
-                  </button>
-                ))}
+                {detectedFields.map((field) => {
+                  // Format display label for CSV columns
+                  const displayLabel = field.path.startsWith('csv_column_')
+                    ? `CSV Column ${parseInt(field.path.replace('csv_column_', ''), 10) + 1}`
+                    : field.path;
+                  
+                  return (
+                    <button
+                      key={field.path}
+                      onClick={() => !disabled && handleFieldPathChange(field.path)}
+                      disabled={disabled}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md border transition-colors ${
+                        config.fieldPath === field.path
+                          ? 'bg-primary/10 border-primary text-primary'
+                          : 'bg-background border-border hover:bg-muted'
+                      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {config.fieldPath === field.path && <Check className="w-4 h-4" />}
+                        <code className="text-xs">{displayLabel}</code>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="px-1.5 py-0.5 bg-muted rounded">
+                          {field.format === 'unix_ms' && 'Unix MS'}
+                          {field.format === 'unix_sec' && 'Unix Sec'}
+                          {field.format === 'iso8601' && 'ISO 8601'}
+                          {field.format === 'iso8601_space' && 'DateTime'}
+                        </span>
+                        <span className="max-w-[100px] truncate">{field.sampleValue}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <input

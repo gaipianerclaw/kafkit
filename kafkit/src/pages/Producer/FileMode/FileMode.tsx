@@ -5,10 +5,9 @@ import { FileUploadZone } from './FileUploadZone';
 import { FilePreview } from './FilePreview';
 import { ColumnMapping } from './ColumnMapping';
 import { StrategyConfig } from './StrategyConfig';
-import { TimestampConfig } from './TimestampConfig';
 import { ValueTimestampMapper } from './ValueTimestampMapper';
 import { ProgressPanel } from './ProgressPanel';
-import { FileFormat, ParsedMessage, ColumnMapping as ColumnMappingType, SendingStrategy, TimestampConfig as TimestampConfigType, ValueTimestampConfig } from './types';
+import { FileFormat, ParsedMessage, ColumnMapping as ColumnMappingType, SendingStrategy, ValueTimestampConfig } from './types';
 import { detectFormat } from './fileParser';
 import {
   getFileInfo,
@@ -69,11 +68,6 @@ export function FileMode({ connection, topic }: FileModeProps) {
   
   // Compression state
   const [compression, setCompression] = useState<'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd'>('none');
-  
-  // Timestamp config state
-  const [timestampConfig, setTimestampConfig] = useState<TimestampConfigType>({
-    mode: 'file', // Default: use timestamp from file
-  });
   
   // Value timestamp config state
   const [valueTimestampConfig, setValueTimestampConfig] = useState<ValueTimestampConfig>({
@@ -165,7 +159,6 @@ export function FileMode({ connection, topic }: FileModeProps) {
     setHeaders([]);
     setCsvHeaders([]);
     setColumnMapping({ keyColumn: '', valueColumn: '', headerColumn: '', partitionColumn: '', useFilePartition: false });
-    setTimestampConfig({ mode: 'file' });
     setValueTimestampConfig({ enabled: false, fieldPath: '', format: 'unknown', mode: 'file' });
     setProgress({ total: 0, sent: 0, failed: 0, current: 0 });
     setSendError(null);
@@ -213,7 +206,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
         for await (const msg of generator) {
           if (abortRef.current) break;
           
-          const record = buildRecord(msg, columnMapping, compression, timestampConfig, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
           
           try {
             await tauriService.produceMessage(connection, topic, record);
@@ -242,7 +235,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
         for await (const msg of generator) {
           if (abortRef.current) break;
           
-          const record = buildRecord(msg, columnMapping, compression, timestampConfig, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
           
           const startTime = Date.now();
           try {
@@ -281,7 +274,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
           if (!isFirst) await sleep(intervalMs);
           isFirst = false;
           
-          const record = buildRecord(msg, columnMapping, compression, timestampConfig, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
           
           try {
             await tauriService.produceMessage(connection, topic, record);
@@ -487,18 +480,6 @@ export function FileMode({ connection, topic }: FileModeProps) {
         </section>
       )}
 
-      {/* Timestamp Config */}
-      {messages.length > 0 && (
-        <section className="bg-background border border-border rounded-lg p-6 relative z-10">
-          <h3 className="text-lg font-medium mb-4">{t('producer.fileMode.timestamp.title')}</h3>
-          <TimestampConfig
-            config={timestampConfig}
-            onChange={setTimestampConfig}
-            disabled={isSending}
-          />
-        </section>
-      )}
-
       {/* Value Timestamp Config */}
       {messages.length > 0 && (
         <section className="bg-background border border-border rounded-lg p-6 relative z-10">
@@ -575,7 +556,6 @@ function buildRecord(
   msg: ParsedMessage, 
   mapping: ColumnMappingType,
   compression: 'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd',
-  timestampConfig: TimestampConfigType,
   valueTimestampConfig: ValueTimestampConfig
 ): {
   partition?: number;
@@ -617,33 +597,8 @@ function buildRecord(
     value = modifyValueTimestamp(value, valueTimestampConfig);
   }
 
-  // Calculate timestamp based on configuration
-  let timestamp: number | undefined;
-  const originalTimestamp = extractTimestamp(msg);
-  
-  switch (timestampConfig.mode) {
-    case 'file':
-      // Use original timestamp from file
-      timestamp = originalTimestamp;
-      break;
-    case 'current':
-      // Use current system time
-      timestamp = Date.now();
-      break;
-    case 'fixed':
-      // Use user-specified fixed timestamp
-      timestamp = parseTimestamp(timestampConfig.fixedValue);
-      break;
-    case 'offset':
-      // Apply offset to original timestamp
-      if (originalTimestamp !== undefined) {
-        timestamp = originalTimestamp + (timestampConfig.offsetMs || 0);
-      } else {
-        // If no original timestamp, use current time with offset
-        timestamp = Date.now() + (timestampConfig.offsetMs || 0);
-      }
-      break;
-  }
+  // Use original timestamp from file (metadata timestamp)
+  const timestamp: number | undefined = extractTimestamp(msg);
 
   // Build final record with compression
   const record: {
@@ -690,32 +645,24 @@ function extractTimestamp(msg: ParsedMessage): number | undefined {
 }
 
 /**
- * Parse timestamp from various formats
- */
-function parseTimestamp(value: string | number | undefined): number | undefined {
-  if (value === undefined) return undefined;
-  
-  if (typeof value === 'number') return value;
-  
-  // Try parsing as ISO string first
-  const date = new Date(value);
-  if (!isNaN(date.getTime())) {
-    return date.getTime();
-  }
-  
-  // Try parsing as Unix timestamp (number string)
-  const num = parseInt(value, 10);
-  if (!isNaN(num)) {
-    return num;
-  }
-  
-  return undefined;
-}
-
-/**
  * Modify timestamp field within message value
+ * Supports both JSON and CSV formats
  */
 function modifyValueTimestamp(value: string, config: ValueTimestampConfig): string {
+  // Handle CSV column path (e.g., "csv_column_1")
+  if (config.fieldPath.startsWith('csv_column_')) {
+    const columnIndex = parseInt(config.fieldPath.replace('csv_column_', ''), 10);
+    const parts = value.split(',');
+    
+    if (columnIndex >= 0 && columnIndex < parts.length) {
+      const newTimestamp = calculateNewTimestampValue(parts[columnIndex].trim(), config);
+      parts[columnIndex] = String(newTimestamp);
+      return parts.join(',');
+    }
+    return value;
+  }
+  
+  // Handle JSON object path
   try {
     const obj = JSON.parse(value);
     const modified = modifyTimestampInObject(obj, config.fieldPath, config);
@@ -811,9 +758,22 @@ function calculateNewTimestampValue(originalValue: any, config: ValueTimestampCo
       return Math.floor(newMs / 1000);
     case 'iso8601':
       return new Date(newMs).toISOString();
+    case 'iso8601_space':
+      // Format as yyyy-MM-dd HH:mm:ss.SSS (preserve original CSV format)
+      return formatDateWithSpace(newMs);
     default:
       return newMs;
   }
+}
+
+// Format date as yyyy-MM-dd HH:mm:ss.SSS
+function formatDateWithSpace(timestamp: number): string {
+  const date = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const padMs = (n: number) => String(n).padStart(3, '0');
+  
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${padMs(date.getMilliseconds())}`;
 }
 
 function safeParseJson(str: string): Record<string, string> | undefined {
