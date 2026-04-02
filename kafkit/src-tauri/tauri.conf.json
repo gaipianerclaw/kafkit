@@ -34,6 +34,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "deb", "rpm", "msi"],
+    "name": "Kafkit",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -47,6 +48,16 @@
     "longDescription": "A cross-platform desktop client for Apache Kafka",
     "publisher": "Kafkit",
     "copyright": "Copyright (c) 2025 Kafkit",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "license": "",
+      "entitlements": null,
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "hardenedRuntime": true
+    },
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
