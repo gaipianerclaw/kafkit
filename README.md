@@ -2,7 +2,7 @@
 
 跨平台 Kafka 桌面客户端，支持 macOS、Linux 和 Windows。
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue)
+![Version](https://img.shields.io/badge/version-1.0.5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能特性
@@ -56,16 +56,16 @@
 从 [GitHub Releases](https://github.com/gaipianerclaw/kafkit/releases) 下载最新版本。
 
 ### macOS
-- `Kafkit_1.0.2_aarch64.dmg` (Apple Silicon)
-- `Kafkit_1.0.2_x64.dmg` (Intel)
+- `Kafkit_1.0.5_aarch64.dmg` (Apple Silicon)
+- `Kafkit_1.0.5_x64.dmg` (Intel)
 
 ### Linux
-- `kafkit_1.0.2_amd64.deb` (Ubuntu/Debian)
-- `kafkit-1.0.2-1.x86_64.rpm` (Fedora/RHEL)
+- `kafkit_1.0.5_amd64.deb` (Ubuntu/Debian)
+- `kafkit-1.0.5-1.x86_64.rpm` (Fedora/RHEL)
 
 ### Windows
-- `Kafkit_1.0.2_x64-setup.exe`
-- `Kafkit_1.0.2_x64.msi`
+- `Kafkit_1.0.5_x64-setup.exe`
+- `Kafkit_1.0.5_x64.msi`
 
 ## 快速开始
 
