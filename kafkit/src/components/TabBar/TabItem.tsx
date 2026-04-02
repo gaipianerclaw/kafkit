@@ -2,7 +2,7 @@
  * TabItem - Individual tab component
  */
 import { useState } from 'react';
-import { X, Radio, Send } from 'lucide-react';
+import { X, Radio, Send, Eye } from 'lucide-react';
 import { Tab, TabType } from '../../stores';
 
 interface TabItemProps {
@@ -19,6 +19,8 @@ interface TabItemProps {
 
 const getTabIcon = (type: TabType) => {
   switch (type) {
+    case 'topic-preview':
+      return <Eye className="w-3 h-3" />;
     case 'consumer':
       return <Radio className="w-3 h-3" />;
     case 'producer':
@@ -31,6 +33,8 @@ const getTabIcon = (type: TabType) => {
 const getTabColor = (type: TabType, isActive: boolean) => {
   if (!isActive) return 'text-muted-foreground';
   switch (type) {
+    case 'topic-preview':
+      return 'text-gray-600';
     case 'consumer':
       return 'text-blue-600';
     case 'producer':

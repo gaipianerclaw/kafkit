@@ -5,6 +5,7 @@
 import { useTabStore } from '../../stores';
 import { ConsumerPage } from '../../pages/Consumer/ConsumerPage';
 import { ProducerPage } from '../../pages/Producer/ProducerPage';
+import { TopicPreview } from '../../pages/TopicPreview';
 
 export function TabContent() {
   const { tabs, activeTabId } = useTabStore();
@@ -37,7 +38,13 @@ export function TabContent() {
               left: 0
             }}
           >
-            {tab.type === 'consumer' ? (
+            {tab.type === 'topic-preview' ? (
+              <TopicPreview
+                tabId={tab.id}
+                topic={tab.topic}
+                connectionId={tab.connectionId}
+              />
+            ) : tab.type === 'consumer' ? (
               <ConsumerPage
                 tabId={tab.id}
                 topic={tab.topic}

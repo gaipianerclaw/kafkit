@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Send, FileJson, Clock, FileUp } from 'lucide-react';
+import { Send, FileJson, Clock, FileUp } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
@@ -54,10 +54,13 @@ export function ProducerPage(props: ProducerPageProps = {}) {
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/main/topics')} className="mr-2">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h1 className="text-lg font-semibold">{t('producer.title')}: {decodedTopic}</h1>
+          {/* Topic 名称显示 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{decodedTopic}</span>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              {t('producer.title')}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Format Selector (hide in file mode) */}

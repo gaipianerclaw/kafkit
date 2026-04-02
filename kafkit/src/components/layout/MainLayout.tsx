@@ -14,7 +14,7 @@ import { TabBar } from '../TabBar';
 import { TabContent } from '../TabBar/TabContent';
 import { NewTabDialog } from '../TabBar/NewTabDialog';
 import { TopicPanel } from '../TopicPanel';
-import { TopicDetailView } from '../TopicDetailView';
+
 
 export function MainLayout() {
   const navigate = useNavigate();
@@ -24,8 +24,6 @@ export function MainLayout() {
   const { tabs, activeTabId, activateTab } = useTabStore();
   const [showNewTabDialog, setShowNewTabDialog] = useState(false);
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(true);
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-
   useEffect(() => {
     fetchConnections();
   }, []);
@@ -57,16 +55,8 @@ export function MainLayout() {
   // Handle sidebar navigation - deactivate tab to show workspace
   const handleNavClick = useCallback((path: string) => {
     activateTab(null);
-    setSelectedTopic(null);
     navigate(path);
   }, [activateTab, navigate]);
-
-  // Handle topic selection
-  const handleSelectTopic = useCallback((topic: string) => {
-    setSelectedTopic(topic);
-    // Deactivate any active tab to show the topic detail
-    activateTab(null);
-  }, [activateTab]);
 
   return (
     <div className="flex h-screen bg-background">
@@ -126,8 +116,6 @@ export function MainLayout() {
       <TopicPanel 
         isOpen={isTopicPanelOpen} 
         onToggle={() => setIsTopicPanelOpen(!isTopicPanelOpen)}
-        selectedTopic={selectedTopic}
-        onSelectTopic={handleSelectTopic}
       />
 
       {/* Main Workspace - Third column */}
@@ -144,32 +132,25 @@ export function MainLayout() {
             <TabContent />
           </div>
           
-          {/* Show topic detail or welcome when no active tab */}
+          {/* Show welcome when no active tab */}
           {!hasActiveTab && (
             <div className="absolute inset-0 w-full h-full p-4 bg-background">
-              {selectedTopic ? (
-                <TopicDetailView topicName={selectedTopic} />
+              {isGroupsRoute ? (
+                <div>消费组页面（待实现）</div>
+              ) : isSettingsRoute ? (
+                <div>设置页面（待实现）</div>
+              ) : isConnectionsRoute ? (
+                <div>连接管理页面（待实现）</div>
               ) : (
-                <>
-                  {/* Default workspace view when no active tab */}
-                  {isGroupsRoute ? (
-                    <div>消费组页面（待实现）</div>
-                  ) : isSettingsRoute ? (
-                    <div>设置页面（待实现）</div>
-                  ) : isConnectionsRoute ? (
-                    <div>连接管理页面（待实现）</div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <Home className="w-16 h-16 mb-4 opacity-20" />
-                      <p className="text-lg mb-2">欢迎使用 Kafkit</p>
-                      <p className="text-sm">
-                        {activeConnection 
-                          ? '在左侧 Topic 面板中选择一个 Topic 查看详情' 
-                          : '请先选择一个 Kafka 连接'}
-                      </p>
-                    </div>
-                  )}
-                </>
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Home className="w-16 h-16 mb-4 opacity-20" />
+                  <p className="text-lg mb-2">欢迎使用 Kafkit</p>
+                  <p className="text-sm">
+                    {activeConnection 
+                      ? '在左侧 Topic 面板中选择一个 Topic 开始' 
+                      : '请先选择一个 Kafka 连接'}
+                  </p>
+                </div>
               )}
             </div>
           )}

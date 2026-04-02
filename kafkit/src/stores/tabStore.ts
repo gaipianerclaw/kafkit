@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type TabType = 'consumer' | 'producer';
+export type TabType = 'topic-preview' | 'consumer' | 'producer';
 
 export interface Tab {
   id: string;
@@ -38,6 +38,7 @@ export interface TabState {
   closeTabsToRight: (id: string) => void;
   getTabById: (id: string) => Tab | undefined;
   findExistingTab: (type: TabType, topic: string, connectionId: string) => Tab | undefined;
+  convertTab: (id: string, newType: 'consumer' | 'producer') => void;
 }
 
 // Generate unique tab ID
@@ -45,7 +46,11 @@ const generateTabId = () => `tab_${Date.now()}_${Math.random().toString(36).subs
 
 // Generate default tab title
 const generateTabTitle = (type: TabType, topic: string): string => {
-  const typeLabel = type === 'consumer' ? '消费' : '生产';
+  const typeLabel = {
+    'topic-preview': '预览',
+    'consumer': '消费',
+    'producer': '生产',
+  }[type];
   return `${topic} ${typeLabel}`;
 };
 
@@ -208,6 +213,21 @@ export const useTabStore = create<TabState>()(
         return get().tabs.find(
           t => t.type === type && t.topic === topic && t.connectionId === connectionId
         );
+      },
+
+      convertTab: (id, newType) => {
+        const { tabs } = get();
+        set({
+          tabs: tabs.map(t => {
+            if (t.id !== id) return t;
+            return {
+              ...t,
+              type: newType,
+              title: generateTabTitle(newType, t.topic),
+              config: {}
+            };
+          })
+        });
       }
     }),
     {

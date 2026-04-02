@@ -16,8 +16,7 @@ interface TopicInfo {
 interface TopicPanelProps {
   isOpen: boolean;
   onToggle: () => void;
-  selectedTopic: string | null;
-  onSelectTopic: (topic: string) => void;
+  selectedTopic?: string | null;
 }
 
 // 检测是否在 Tauri 环境中
@@ -34,7 +33,7 @@ const getService = async () => {
   }
 };
 
-export function TopicPanel({ isOpen, onToggle, selectedTopic, onSelectTopic }: TopicPanelProps) {
+export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps) {
   const navigate = useNavigate();
   const { activeConnection, connections, setActiveConnection } = useConnectionStore();
   const { tabs, addTab } = useTabStore();
@@ -107,10 +106,18 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic, onSelectTopic }: T
     });
   }, []);
 
+  // 点击 topic 创建预览 tab
   const handleTopicClick = useCallback((topicName: string) => {
-    onSelectTopic(topicName);
-  }, [onSelectTopic]);
+    if (!activeConnection) return;
+    if (!canAddTab) {
+      alert('最多只能打开 10 个标签页，请先关闭部分标签');
+      return;
+    }
+    // 创建预览 tab
+    addTab('topic-preview', topicName, activeConnection);
+  }, [activeConnection, addTab, canAddTab]);
 
+  // 双击创建消费者 tab（保留快捷操作）
   const handleDoubleClick = useCallback((topicName: string) => {
     handleOpenConsumer(topicName);
   }, [handleOpenConsumer]);

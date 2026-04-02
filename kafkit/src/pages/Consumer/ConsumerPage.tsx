@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, Trash2, Download, Copy, Check, ChevronDown, ChevronRight, Settings2, FileText, Eye } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Play, Pause, Trash2, Download, Copy, Check, ChevronDown, ChevronRight, Settings2, FileText, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { useConnectionStore } from '../../stores';
@@ -609,7 +609,6 @@ interface ConsumerPageProps {
 }
 
 export function ConsumerPage(props: ConsumerPageProps = {}) {
-  const navigate = useNavigate();
   const { topic: routeTopic } = useParams();
   const { activeConnection: globalActiveConnection } = useConnectionStore();
   const { t } = useTranslation();
@@ -635,7 +634,7 @@ export function ConsumerPage(props: ConsumerPageProps = {}) {
   const [selectedPartition, setSelectedPartition] = useState<string>('all');
   const [detail, setDetail] = useState<TopicDetail | null>(null);
   const [isLoadingTopicInfo, setIsLoadingTopicInfo] = useState(true);
-  const [topics, setTopics] = useState<{ name: string; partitionCount: number }[]>([]);
+  const [, setTopics] = useState<{ name: string; partitionCount: number }[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
   const [previewLimit, setPreviewLimit] = useState('500');
@@ -1197,48 +1196,14 @@ export function ConsumerPage(props: ConsumerPageProps = {}) {
       {/* Header */}
       <div className="flex-shrink-0 min-h-14 border-b border-border flex items-center justify-between px-4 py-2 bg-background z-20 flex-wrap gap-y-2">
         <div className="flex items-center">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={async () => {
-              // 如果正在消费，先停止消费
-              if (isConsuming) {
-                await stopConsumption();
-              }
-              navigate('/main/topics');
-            }} 
-            className="mr-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <div className="flex items-center gap-3">
-            {/* Topic 选择器 */}
-            {topics.length > 0 && (
-              <Select
-                value={decodedTopic}
-                onChange={async e => {
-                  const newTopic = e.target.value;
-                  if (newTopic !== decodedTopic) {
-                    // 标记正在切换 topic，避免 cleanup 时重复停止
-                    isSwitchingTopicRef.current = true;
-                    // 切换 topic 时停止当前消费
-                    if (isConsuming) {
-                      await stopConsumption();
-                    }
-                    // t('consumer.clear')消息
-                    setMessages([]);
-                    // 重置状态
-                    setDetail(null);
-                    setSelectedPartition('all');
-                    // 导航到新 topic
-                    navigate(`/main/topics/${encodeURIComponent(newTopic)}/consume`);
-                  }
-                }}
-                options={topics.map(t => ({ value: t.name, label: t.name }))}
-                className="w-48"
-                disabled={isConsuming}
-              />
-            )}
+            {/* Topic 名称显示 */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{decodedTopic}</span>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                {t('consumer.title')}
+              </span>
+            </div>
             <div>
               <p className="text-xs text-muted-foreground">
                 {isConsuming && consumerConfig.mode === 'file' 
