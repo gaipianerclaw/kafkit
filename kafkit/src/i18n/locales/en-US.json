@@ -251,13 +251,18 @@
         "partitionColumnHint": "Select the column containing target partition number, leave empty for auto",
         "none": "None",
         "useAllColumns": "Use all columns",
-        "auto": "Auto"
+        "auto": "Auto",
+        "keyHash": "Key Hash",
+        "keyHashHint": "Messages with same key go to same partition, preserving order",
+        "roundrobin": "Round Robin",
+        "roundrobinHint": "Messages evenly distributed across partitions (Key still sent to Kafka but doesn't affect partition selection)"
       },
       "partition": {
-        "title": "Partition Settings",
+        "title": "Partition Strategy",
         "useFilePartition": "Use Partition from File",
-        "useFilePartitionHint": "When enabled, messages will be sent to the partition specified in the file. When disabled, auto partition is used (default)",
-        "column": "Partition Column (CSV)"
+        "useFilePartitionHint": "Send messages to the partition specified in the file",
+        "column": "Partition Column (CSV)",
+        "autoDetect": "Auto Detect"
       },
       "strategy": {
         "title": "Sending Strategy",

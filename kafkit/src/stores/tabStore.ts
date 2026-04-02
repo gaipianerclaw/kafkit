@@ -233,10 +233,8 @@ export const useTabStore = create<TabState>()(
     {
       name: 'kafkit-tabs',
       partialize: (state) => ({ 
-        tabs: state.tabs.map(t => ({
-          ...t,
-          isActive: false // Don't persist active state
-        })),
+        // Don't persist tabs - clear on app restart
+        tabs: [],
         activeTabId: null
       })
     }

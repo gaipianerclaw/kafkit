@@ -251,13 +251,18 @@
         "partitionColumnHint": "选择包含目标分区号的列，留空则自动分配",
         "none": "无",
         "useAllColumns": "使用所有列",
-        "auto": "自动"
+        "auto": "自动",
+        "keyHash": "基于 Key 哈希",
+        "keyHashHint": "相同 Key 的消息发送到同一分区，保证顺序",
+        "roundrobin": "轮询",
+        "roundrobinHint": "消息均匀分布到各分区（Key 仍会被发送到 Kafka，但不影响分区选择）"
       },
       "partition": {
-        "title": "Partition 设置",
+        "title": "分区策略",
         "useFilePartition": "使用文件中的 Partition",
-        "useFilePartitionHint": "开启后将按照文件中记录的 Partition 发送消息，关闭则使用自动分区（默认）",
-        "column": "Partition 列 (CSV)"
+        "useFilePartitionHint": "按照文件中 partition 列的值发送到指定分区",
+        "column": "Partition 列 (CSV)",
+        "autoDetect": "自动检测"
       },
       "strategy": {
         "title": "发送策略",
