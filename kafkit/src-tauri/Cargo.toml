@@ -1,5 +1,5 @@
 [package]
-name = "kafkit"
+name = "Kafkit"
 version = "1.0.5"
 description = "A cross-platform Kafka desktop client"
 edition = "2021"
