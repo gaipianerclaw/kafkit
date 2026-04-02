@@ -1,6 +1,9 @@
 /**
- * TabContent - Render all tabs with Keep-Alive (display: none for inactive)
+ * TabContent - Render all tabs with Keep-Alive
  * This preserves component state when switching between tabs
+ * 
+ * Note: We use visibility:hidden instead of display:none for inactive tabs
+ * to ensure virtual scrolling works correctly (it needs visible dimensions)
  */
 import { useTabStore } from '../../stores';
 import { ConsumerPage } from '../../pages/Consumer/ConsumerPage';
@@ -29,13 +32,15 @@ export function TabContent() {
         return (
           <div
             key={tab.id}
-            className={isActive ? 'block' : 'hidden'}
             style={{ 
               width: '100%', 
               height: '100%',
-              position: isActive ? 'relative' : 'absolute',
+              position: 'absolute',
               top: 0,
-              left: 0
+              left: 0,
+              visibility: isActive ? 'visible' : 'hidden',
+              pointerEvents: isActive ? 'auto' : 'none',
+              zIndex: isActive ? 1 : 0
             }}
           >
             {tab.type === 'topic-preview' ? (
