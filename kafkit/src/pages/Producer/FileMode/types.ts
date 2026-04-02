@@ -19,6 +19,9 @@ export interface ParsedMessage {
   _raw?: Record<string, any>;
 }
 
+/** Partition strategy types */
+export type PartitionStrategy = 'key-hash' | 'roundrobin';
+
 /** Column mapping for CSV files */
 export interface ColumnMapping {
   /** Column containing the message key */
@@ -31,6 +34,8 @@ export interface ColumnMapping {
   partitionColumn: string;
   /** Whether to use partition from file (default: false) */
   useFilePartition: boolean;
+  /** Partition assignment strategy (default: 'key-hash') */
+  partitionStrategy: PartitionStrategy;
 }
 
 /** Timestamp mode types */

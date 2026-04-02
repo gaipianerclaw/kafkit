@@ -56,6 +56,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
     headerColumn: '',
     partitionColumn: '',
     useFilePartition: false, // 默认不按照文件中的 partition 发送
+    partitionStrategy: 'key-hash', // 默认基于 key hash 分区
   });
   const [headers, setHeaders] = useState<string[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]); // Store CSV headers for row parsing
@@ -96,7 +97,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
     setValidationErrors([]);
     setHeaders([]);
     setCsvHeaders([]);
-    setColumnMapping({ keyColumn: '', valueColumn: '', headerColumn: '', partitionColumn: '', useFilePartition: false });
+    setColumnMapping({ keyColumn: '', valueColumn: '', headerColumn: '', partitionColumn: '', useFilePartition: false, partitionStrategy: 'key-hash' });
     setIsParsing(true);
     
     try {
@@ -158,7 +159,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
     setFileInfo(null);
     setHeaders([]);
     setCsvHeaders([]);
-    setColumnMapping({ keyColumn: '', valueColumn: '', headerColumn: '', partitionColumn: '', useFilePartition: false });
+    setColumnMapping({ keyColumn: '', valueColumn: '', headerColumn: '', partitionColumn: '', useFilePartition: false, partitionStrategy: 'key-hash' });
     setValueTimestampConfig({ enabled: false, fieldPath: '', format: 'unknown', mode: 'file' });
     setProgress({ total: 0, sent: 0, failed: 0, current: 0 });
     setSendError(null);
@@ -590,6 +591,12 @@ function buildRecord(
     headers = mapping.headerColumn && data[mapping.headerColumn] 
       ? safeParseJson(data[mapping.headerColumn]) 
       : undefined;
+  }
+
+  // If partition strategy is roundrobin, ignore key for partition assignment
+  // This ensures messages are evenly distributed regardless of key
+  if (mapping.partitionStrategy === 'roundrobin') {
+    key = undefined;
   }
 
   // Modify timestamp in value if enabled
