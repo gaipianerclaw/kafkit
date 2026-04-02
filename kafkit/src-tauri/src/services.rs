@@ -782,7 +782,10 @@ impl ConnectionManager {
         // 使用 Kafka 默认分区器 (murmur2_random)，基于 key 的 hash 分配分区
         
         let producer: FutureProducer = producer_config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create producer: {}", e)))?;
+            .map_err(|e| {
+                log::error!("Failed to create producer for connection {}: {}", connection.id, e);
+                AppError::KafkaError(format!("Failed to create producer: {}", e))
+            })?;
         
         println!("[Kafkit] Producer created successfully");
         producers.insert(connection.id.clone(), producer.clone());
@@ -875,8 +878,9 @@ impl ConnectionManager {
                 })
             }
             Err((e, _)) => {
-                let error_msg = format!("Failed to send message: {}", e);
+                let error_msg = format!("Failed to send message to topic {}: {}", topic, e);
                 println!("[Kafkit] {}", error_msg);
+                log::error!("Producer error: {}", error_msg);
                 Err(AppError::KafkaError(error_msg))
             }
         }
@@ -923,8 +927,9 @@ impl ConnectionManager {
                     success += 1;
                 }
                 Err((e, _)) => {
-                    let error_msg = format!("Message {} failed: {}", i, e);
+                    let error_msg = format!("Batch message {} failed: {}", i, e);
                     println!("[Kafkit] {}", error_msg);
+                    log::error!("Producer batch error: {}", error_msg);
                     failed += 1;
                     errors.push(BatchProduceError {
                         index: i as i32,
@@ -1062,9 +1067,11 @@ impl ConnectionManager {
                 let error_msg = format!("{}", e);
                 if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
                     println!("[Kafkit] Consumer group '{}' not found or expired", group_id);
+                    log::warn!("Consumer group '{}' not found or expired", group_id);
                     return Ok(vec![]);
                 }
                 println!("[Kafkit] Failed to fetch group info: {}", e);
+                log::error!("Failed to fetch consumer group info for {}: {}", group_id, e);
                 return Ok(vec![]);
             }
         };
@@ -1081,6 +1088,7 @@ impl ConnectionManager {
             Ok(m) => m,
             Err(e) => {
                 println!("[Kafkit] Failed to fetch metadata: {}", e);
+                log::error!("Failed to fetch metadata for consumer lag: {}", e);
                 return Ok(vec![]);
             }
         };
@@ -1108,9 +1116,11 @@ impl ConnectionManager {
                         let error_msg = format!("{}", e);
                         if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
                             println!("[Kafkit] Group '{}' expired during query", group_id);
+                            log::warn!("Consumer group '{}' expired during lag query", group_id);
                             return Ok(result);
                         }
                         println!("[Kafkit] Failed to fetch committed offsets for {}: {}", topic_name, e);
+                        log::error!("Failed to fetch committed offsets for {}: {}", topic_name, e);
                         continue;
                     }
                 };
@@ -1156,6 +1166,7 @@ impl ConnectionManager {
                         }
                         Err(e) => {
                             println!("[Kafkit] Failed to fetch watermarks for {}-{}: {}", topic_name, partition, e);
+                            log::warn!("Failed to fetch watermarks for {}-{}: {}", topic_name, partition, e);
                         }
                     }
                 }
@@ -1312,6 +1323,7 @@ impl ConnectionManager {
                 Err(e) => {
                     let error_msg = format!("Failed to reset offset for {}-{}: {}", topic, p, e);
                     println!("[Kafkit] {}", error_msg);
+                    log::error!("Offset reset failed for {}-{}: {}", topic, p, e);
                     reset_results.push(PartitionOffsetResult {
                         topic: topic.to_string(),
                         partition: p,
@@ -1448,7 +1460,10 @@ impl ConsumerService {
         config.set("debug", "consumer");
         
         let consumer: KafkaStreamConsumer = config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
+            .map_err(|e| {
+                log::error!("Failed to create consumer for session {}: {}", session_id, e);
+                AppError::KafkaError(format!("Failed to create consumer: {}", e))
+            })?;
         
         println!("[Kafkit] Consumer created successfully for session: {}", session_id);
 
@@ -1543,10 +1558,12 @@ impl ConsumerService {
                         let event_name = format!("kafka-message-{}", session_id_clone);
                         if let Err(e) = window.emit(&event_name, &kafka_msg) {
                             println!("[Kafkit] Failed to emit message: {}", e);
+                            log::warn!("Failed to emit message to frontend in session {}: {}", session_id_clone, e);
                         }
                     }
                     Ok(Err(e)) => {
                         println!("[Kafkit] Consumer error: {}", e);
+                        log::error!("Consumer error in session {}: {}", session_id_clone, e);
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                     Err(_) => {

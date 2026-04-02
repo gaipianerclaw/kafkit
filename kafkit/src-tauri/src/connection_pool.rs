@@ -55,7 +55,10 @@ impl ConnectionPool {
         // 创建新的 producer
         let config = Self::create_client_config(connection)?;
         let producer: FutureProducer = config.create()
-            .map_err(|e| AppError::KafkaError(format!("Failed to create producer: {}", e)))?;
+            .map_err(|e| {
+                log::error!("Failed to create producer in pool for connection {}: {}", connection_id, e);
+                AppError::KafkaError(format!("Failed to create producer: {}", e))
+            })?;
         
         // 存入缓存
         let mut producers = self.producers.write().await;
