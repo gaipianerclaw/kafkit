@@ -146,15 +146,19 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
 
     setCreating(true);
     try {
+      console.log('[TopicPanel] Creating topic:', newTopicName.trim(), 'partitions:', newTopicPartitions, 'replicas:', newTopicReplicas);
       const tauriService = await getService();
       await tauriService.createTopic(activeConnection, newTopicName.trim(), newTopicPartitions, newTopicReplicas);
+      console.log('[TopicPanel] Topic created successfully');
       setNewTopicName('');
       setNewTopicPartitions(1);
       setNewTopicReplicas(1);
       setShowCreateDialog(false);
       fetchTopics();
     } catch (err) {
-      alert(t('topics.createError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+      console.error('[TopicPanel] Failed to create topic:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(t('topics.createError') + ': ' + (errorMessage || t('common.unknownError')));
     } finally {
       setCreating(false);
     }
@@ -174,13 +178,17 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
 
     setDeleting(true);
     try {
+      console.log('[TopicPanel] Deleting topic:', topicToDelete.name);
       const tauriService = await getService();
       await tauriService.deleteTopic(activeConnection, topicToDelete.name);
+      console.log('[TopicPanel] Topic deleted successfully');
       setShowDeleteDialog(false);
       setTopicToDelete(null);
       fetchTopics();
     } catch (err) {
-      alert(t('topics.deleteError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+      console.error('[TopicPanel] Failed to delete topic:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(t('topics.deleteError') + ': ' + (errorMessage || t('common.unknownError')));
     } finally {
       setDeleting(false);
     }
