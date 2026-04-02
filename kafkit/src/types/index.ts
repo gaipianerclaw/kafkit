@@ -105,6 +105,8 @@ export interface ProduceMessage {
   compression?: 'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd';
   /** Timestamp in milliseconds since epoch (optional) */
   timestamp?: number;
+  /** Partition assignment strategy: 'key-hash' uses key for partition, 'roundrobin' ignores key */
+  partitionStrategy?: 'key-hash' | 'roundrobin';
 }
 
 export interface ProduceResult {

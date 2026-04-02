@@ -15,11 +15,14 @@ use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::client::DefaultClientContext;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
+use rdkafka::message::{Header, OwnedHeaders};
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
     clients: Mutex<HashMap<String, BaseConsumer>>,
     producers: Mutex<HashMap<String, FutureProducer>>,
+    // 轮询计数器: (connection_id, topic) -> next_partition
+    roundrobin_counters: Mutex<HashMap<(String, String), i32>>,
 }
 
 impl ConnectionManager {
@@ -27,6 +30,7 @@ impl ConnectionManager {
         Self {
             clients: Mutex::new(HashMap::new()),
             producers: Mutex::new(HashMap::new()),
+            roundrobin_counters: Mutex::new(HashMap::new()),
         }
     }
 
@@ -732,6 +736,29 @@ impl ConnectionManager {
         Ok(config_entries)
     }
 
+    /// 获取 Topic 的分区数（用于轮询策略）
+    async fn get_topic_partition_count(&self, connection: &Connection, topic: &str) -> Result<i32, AppError> {
+        // 创建临时的 consumer 获取 metadata
+        let config = Self::create_client_config(connection)?;
+        let consumer: BaseConsumer = config.create()
+            .map_err(|e| AppError::KafkaError(format!("Failed to create consumer: {}", e)))?;
+        
+        // 获取 metadata
+        let metadata = consumer.fetch_metadata(Some(topic), Duration::from_secs(5))
+            .map_err(|e| AppError::KafkaError(format!("Failed to fetch metadata: {}", e)))?;
+        
+        // 查找 topic 的分区数
+        for topic_metadata in metadata.topics() {
+            if topic_metadata.name() == topic {
+                let partition_count = topic_metadata.partitions().len() as i32;
+                println!("[Kafkit] Topic '{}' has {} partitions", topic, partition_count);
+                return Ok(partition_count);
+            }
+        }
+        
+        Err(AppError::KafkaError(format!("Topic '{}' not found", topic)))
+    }
+
     /// 获取或创建 Producer
     async fn get_producer(&self, connection: &Connection) -> Result<FutureProducer, AppError> {
         let mut producers = self.producers.lock().await;
@@ -752,9 +779,7 @@ impl ConnectionManager {
         producer_config.set("retries", "3");
         producer_config.set("max.in.flight.requests.per.connection", "5");
         producer_config.set("compression.type", "snappy");
-        // 使用轮询分区策略，确保消息均匀分布到各个分区
-        // 注意：如果消息有 key，仍然会基于 key 的 hash 分配到固定分区
-        producer_config.set("partitioner", "roundrobin");
+        // 使用 Kafka 默认分区器 (murmur2_random)，基于 key 的 hash 分配分区
         
         let producer: FutureProducer = producer_config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create producer: {}", e)))?;
@@ -774,6 +799,7 @@ impl ConnectionManager {
     ) -> Result<ProduceResult, AppError> {
         println!("[Kafkit] Producing message to topic: {}", topic);
         
+        // 获取 producer（默认使用 key hash 分区）
         let producer = self.get_producer(connection).await?;
         
         // 创建消息记录
@@ -782,19 +808,55 @@ impl ConnectionManager {
         // 设置消息内容
         record = record.payload(&message.value);
         
-        // 设置 key（如果有）
+        // 设置 key（始终发送，数据完整性）
         if let Some(key) = &message.key {
             record = record.key(key.as_bytes());
         }
         
-        // 设置 partition（如果有）
-        if let Some(partition) = message.partition {
-            record = record.partition(partition);
+        // 设置 partition - 优先级：1.用户指定 2.轮询策略 3.不设置（使用key hash）
+        let partition = if let Some(p) = message.partition {
+            // 用户明确指定了分区
+            Some(p)
+        } else if message.partition_strategy.as_deref() == Some("roundrobin") {
+            // 轮询策略：在应用层计算分区号
+            match self.get_topic_partition_count(connection, topic).await {
+                Ok(partition_count) if partition_count > 0 => {
+                    let mut counters = self.roundrobin_counters.lock().await;
+                    let counter_key = (connection.id.clone(), topic.to_string());
+                    let next_partition = counters.get(&counter_key).copied().unwrap_or(0);
+                    // 更新计数器
+                    counters.insert(counter_key, (next_partition + 1) % partition_count);
+                    Some(next_partition)
+                }
+                _ => {
+                    println!("[Kafkit] Warning: Could not get partition count for roundrobin, falling back to key hash");
+                    None
+                }
+            }
+        } else {
+            // key-hash策略：不设置partition，让Kafka根据key决定
+            None
+        };
+        
+        if let Some(p) = partition {
+            record = record.partition(p);
         }
         
         // 设置 timestamp（如果有）
         if let Some(timestamp) = message.timestamp {
             record = record.timestamp(timestamp);
+        }
+        
+        // 设置 headers（如果有）
+        if let Some(headers_map) = &message.headers {
+            let mut headers = OwnedHeaders::new();
+            for (key, value) in headers_map {
+                headers = headers.insert(Header {
+                    key,
+                    value: Some(value.as_bytes()),
+                });
+            }
+            record = record.headers(headers);
         }
         
         // 发送消息

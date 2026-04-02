@@ -190,6 +190,7 @@ pub struct KafkaMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProduceMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partition: Option<i32>,
@@ -201,6 +202,12 @@ pub struct ProduceMessage {
     /// Timestamp in milliseconds since epoch (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<i64>,
+    /// Partition assignment strategy: 'key-hash' uses key for partition, 'roundrobin' ignores key
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition_strategy: Option<String>,
+    /// Compression type: 'gzip', 'snappy', 'lz4', 'zstd', or 'none'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compression: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -207,26 +207,30 @@ export function FileMode({ connection, topic }: FileModeProps) {
         for await (const msg of generator) {
           if (abortRef.current) break;
           
-          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig, csvHeaders);
           
           try {
             await tauriService.produceMessage(connection, topic, record);
             sentCount++;
           } catch (error) {
             failedCount++;
+            console.error('[FileMode] Failed to send message:', error);
+            // Log first few errors for debugging
+            if (failedCount <= 3) {
+              setSendError(String(error));
+            }
           }
           
           processedCount++;
-          if (processedCount % 100 === 0) {
-            const currentPos = startFrom + processedCount;
-            setProgress(p => ({ 
-              ...p, 
-              total: Math.max(p.total, currentPos), // Update total if exceeded
-              sent: startFrom + sentCount, 
-              failed: failedCount,
-              current: currentPos 
-            }));
-          }
+          // Update progress after every message
+          const currentPos = startFrom + processedCount;
+          setProgress(p => ({ 
+            ...p, 
+            total: Math.max(p.total, currentPos),
+            sent: startFrom + sentCount, 
+            failed: failedCount,
+            current: currentPos 
+          }));
         }
       } else if (strategy.type === 'tps') {
         // TPS-controlled sending
@@ -236,7 +240,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
         for await (const msg of generator) {
           if (abortRef.current) break;
           
-          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig, csvHeaders);
           
           const startTime = Date.now();
           try {
@@ -254,16 +258,15 @@ export function FileMode({ connection, topic }: FileModeProps) {
             await sleep(waitTime);
           }
           
-          if (processedCount % 100 === 0) {
-            const currentPos = startFrom + processedCount;
-            setProgress(p => ({ 
-              ...p, 
-              total: Math.max(p.total, currentPos),
-              sent: startFrom + sentCount, 
-              failed: failedCount,
-              current: currentPos 
-            }));
-          }
+          // Update progress after every message
+          const currentPos = startFrom + processedCount;
+          setProgress(p => ({ 
+            ...p, 
+            total: Math.max(p.total, currentPos),
+            sent: startFrom + sentCount, 
+            failed: failedCount,
+            current: currentPos 
+          }));
         }
       } else if (strategy.type === 'interval') {
         // Fixed interval
@@ -275,7 +278,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
           if (!isFirst) await sleep(intervalMs);
           isFirst = false;
           
-          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig);
+          const record = buildRecord(msg, columnMapping, compression, valueTimestampConfig, csvHeaders);
           
           try {
             await tauriService.produceMessage(connection, topic, record);
@@ -285,16 +288,15 @@ export function FileMode({ connection, topic }: FileModeProps) {
           }
           
           processedCount++;
-          if (processedCount % 100 === 0) {
-            const currentPos = startFrom + processedCount;
-            setProgress(p => ({ 
-              ...p, 
-              total: Math.max(p.total, currentPos),
-              sent: startFrom + sentCount, 
-              failed: failedCount,
-              current: currentPos 
-            }));
-          }
+          // Update progress after every message
+          const currentPos = startFrom + processedCount;
+          setProgress(p => ({ 
+            ...p, 
+            total: Math.max(p.total, currentPos),
+            sent: startFrom + sentCount, 
+            failed: failedCount,
+            current: currentPos 
+          }));
         }
       }
       
@@ -398,45 +400,88 @@ export function FileMode({ connection, topic }: FileModeProps) {
       {/* Partition Config - 对所有格式显示 */}
       {messages.length > 0 && (
         <section className="bg-background border border-border rounded-lg p-6 relative z-10">
-          <h3 className="text-lg font-medium mb-4">{t('producer.fileMode.partition.title')}</h3>
+          <h3 className="text-lg font-medium mb-4">{t('producer.fileMode.partition.title', '分区策略')}</h3>
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
+            {/* 单选：使用文件中的 partition */}
+            <label className="flex items-start gap-3 cursor-pointer">
               <input
-                type="checkbox"
+                type="radio"
+                name="partitionStrategy"
+                value="file-partition"
                 checked={columnMapping.useFilePartition}
-                onChange={(e) => setColumnMapping({ ...columnMapping, useFilePartition: e.target.checked })}
+                onChange={() => setColumnMapping({ ...columnMapping, useFilePartition: true, partitionStrategy: 'key-hash' })}
                 disabled={isSending}
-                className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
+                className="w-4 h-4 mt-0.5"
               />
-              <span className="text-sm font-medium">
-                {t('producer.fileMode.partition.useFilePartition')}
-              </span>
-            </label>
-            <p className="text-xs text-muted-foreground ml-7">
-              {t('producer.fileMode.partition.useFilePartitionHint')}
-            </p>
-            
-            {/* CSV 格式时显示列选择 */}
-            {showMapping && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <label className="text-sm font-medium block mb-2">
-                  {t('producer.fileMode.partition.column')}
-                </label>
-                <select
-                  value={columnMapping.partitionColumn}
-                  onChange={(e) => setColumnMapping({ ...columnMapping, partitionColumn: e.target.value })}
-                  disabled={isSending}
-                  className="w-full max-w-xs px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">{t('producer.fileMode.mapping.auto')}</option>
-                  {headers.map((header) => (
-                    <option key={header} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex-1">
+                <span className="text-sm font-medium">
+                  {t('producer.fileMode.partition.useFilePartition', '使用文件中的 Partition')}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {t('producer.fileMode.partition.useFilePartitionHint', '按照文件中 partition 列的值发送到指定分区')}
+                </p>
+                {/* CSV 格式时显示列选择 */}
+                {showMapping && columnMapping.useFilePartition && (
+                  <div className="mt-2">
+                    <select
+                      value={columnMapping.partitionColumn}
+                      onChange={(e) => setColumnMapping({ ...columnMapping, partitionColumn: e.target.value })}
+                      disabled={isSending}
+                      className="w-full max-w-xs px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">{t('producer.fileMode.partition.autoDetect', '自动检测')}</option>
+                      {headers.map((header) => (
+                        <option key={header} value={header}>
+                          {header}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            )}
+            </label>
+
+            {/* 单选：基于 Key 哈希 */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="partitionStrategy"
+                value="key-hash"
+                checked={!columnMapping.useFilePartition && columnMapping.partitionStrategy === 'key-hash'}
+                onChange={() => setColumnMapping({ ...columnMapping, useFilePartition: false, partitionStrategy: 'key-hash' })}
+                disabled={isSending}
+                className="w-4 h-4 mt-0.5"
+              />
+              <div>
+                <span className="text-sm font-medium">
+                  {t('producer.fileMode.mapping.keyHash', '基于 Key 哈希')}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {t('producer.fileMode.mapping.keyHashHint', '相同 Key 的消息发送到同一分区，保证顺序')}
+                </p>
+              </div>
+            </label>
+
+            {/* 单选：轮询 */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="partitionStrategy"
+                value="roundrobin"
+                checked={!columnMapping.useFilePartition && columnMapping.partitionStrategy === 'roundrobin'}
+                onChange={() => setColumnMapping({ ...columnMapping, useFilePartition: false, partitionStrategy: 'roundrobin' })}
+                disabled={isSending}
+                className="w-4 h-4 mt-0.5"
+              />
+              <div>
+                <span className="text-sm font-medium">
+                  {t('producer.fileMode.mapping.roundrobin', '轮询')}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {t('producer.fileMode.mapping.roundrobinHint', '消息均匀分布到各分区（Key 仍会被发送到 Kafka，但不影响分区选择）')}
+                </p>
+              </div>
+            </label>
           </div>
         </section>
       )}
@@ -557,7 +602,8 @@ function buildRecord(
   msg: ParsedMessage, 
   mapping: ColumnMappingType,
   compression: 'none' | 'gzip' | 'snappy' | 'lz4' | 'zstd',
-  valueTimestampConfig: ValueTimestampConfig
+  valueTimestampConfig: ValueTimestampConfig,
+  csvHeaders: string[]
 ): {
   partition?: number;
   key?: string;
@@ -565,6 +611,7 @@ function buildRecord(
   headers?: Record<string, string>;
   compression?: 'gzip' | 'snappy' | 'lz4' | 'zstd';
   timestamp?: number;
+  partitionStrategy?: 'key-hash' | 'roundrobin';
 } {
   // Determine partition: only use file partition if explicitly enabled
   const partition = mapping.useFilePartition 
@@ -593,11 +640,8 @@ function buildRecord(
       : undefined;
   }
 
-  // If partition strategy is roundrobin, ignore key for partition assignment
-  // This ensures messages are evenly distributed regardless of key
-  if (mapping.partitionStrategy === 'roundrobin') {
-    key = undefined;
-  }
+  // Note: When partitionStrategy is 'roundrobin', the backend will ignore key
+  // for partition assignment, but the key is still sent with the message
 
   // Modify timestamp in value if enabled
   if (valueTimestampConfig.enabled && valueTimestampConfig.fieldPath) {
@@ -633,8 +677,9 @@ function buildRecord(
           // Update value based on mapping
           if (mapping.valueColumn && msg._raw) {
             // If valueColumn is set, extract the modified value from the column
-            const headers = Object.keys(msg._raw);
-            const valueIndex = headers.indexOf(mapping.valueColumn);
+            // Use csvHeaders (original file column order) if available, otherwise fall back to Object.keys
+            const headersToUse = csvHeaders.length > 0 ? csvHeaders : Object.keys(msg._raw);
+            const valueIndex = headersToUse.indexOf(mapping.valueColumn);
             if (valueIndex >= 0 && valueIndex < parts.length) {
               value = parts[valueIndex];
             } else {
@@ -682,6 +727,7 @@ function buildRecord(
   const timestamp: number | undefined = extractTimestamp(msg);
 
   // Build final record with compression
+  // Note: If useFilePartition is true, partitionStrategy is ignored (explicit partition takes precedence)
   const record: {
     partition?: number;
     key?: string;
@@ -689,7 +735,16 @@ function buildRecord(
     headers?: Record<string, string>;
     compression?: 'gzip' | 'snappy' | 'lz4' | 'zstd';
     timestamp?: number;
-  } = { partition, key, value, headers, timestamp };
+    partitionStrategy?: 'key-hash' | 'roundrobin';
+  } = { 
+    partition, 
+    key, 
+    value, 
+    headers, 
+    timestamp, 
+    // Only set partitionStrategy when not using file partition
+    partitionStrategy: mapping.useFilePartition ? undefined : mapping.partitionStrategy 
+  };
 
   // Only add compression if not 'none'
   if (compression !== 'none') {
