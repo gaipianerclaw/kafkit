@@ -64,25 +64,26 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Fetch topics
+  // Fetch topics function
+  const fetchTopics = useCallback(async () => {
+    if (!activeConnection) return;
+    setLoading(true);
+    try {
+      const tauriService = await getService();
+      const result = await tauriService.listTopics(activeConnection);
+      setTopics(result);
+    } catch (error) {
+      console.error('Failed to fetch topics:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeConnection]);
+
+  // Fetch topics on mount and when connection changes
   useEffect(() => {
     if (!activeConnection || !isOpen) return;
-    
-    const fetchTopics = async () => {
-      setLoading(true);
-      try {
-        const tauriService = await getService();
-        const result = await tauriService.listTopics(activeConnection);
-        setTopics(result);
-      } catch (error) {
-        console.error('Failed to fetch topics:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchTopics();
-  }, [activeConnection, isOpen]);
+  }, [activeConnection, isOpen, fetchTopics]);
 
   // Filter topics
   const filteredTopics = useMemo(() => {
