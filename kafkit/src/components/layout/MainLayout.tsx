@@ -144,7 +144,7 @@ export function MainLayout() {
           
           {/* Show page content when no active tab */}
           {!hasActiveTab && (
-            <div className="absolute inset-0 w-full h-full bg-background">
+            <div className="absolute inset-0 w-full h-full bg-background z-10">
               {isGroupsRoute ? (
                 <GroupListPage />
               ) : isSettingsRoute ? (
