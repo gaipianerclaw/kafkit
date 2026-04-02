@@ -138,30 +138,38 @@ export function MainLayout() {
         )}
         
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden h-full flex flex-col">
-          {hasActiveTab ? (
+        <div className="flex-1 overflow-hidden h-full flex flex-col relative">
+          {/* Always render TabContent to preserve tab state, hide when no active tab */}
+          <div className={hasActiveTab ? 'flex-1 flex flex-col' : 'hidden'}>
             <TabContent />
-          ) : selectedTopic ? (
-            <TopicDetailView topicName={selectedTopic} />
-          ) : (
-            <div className="w-full h-full p-4">
-              {/* Default workspace view when no active tab */}
-              {isGroupsRoute ? (
-                <div>消费组页面（待实现）</div>
-              ) : isSettingsRoute ? (
-                <div>设置页面（待实现）</div>
-              ) : isConnectionsRoute ? (
-                <div>连接管理页面（待实现）</div>
+          </div>
+          
+          {/* Show topic detail or welcome when no active tab */}
+          {!hasActiveTab && (
+            <div className="absolute inset-0 w-full h-full p-4 bg-background">
+              {selectedTopic ? (
+                <TopicDetailView topicName={selectedTopic} />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Home className="w-16 h-16 mb-4 opacity-20" />
-                  <p className="text-lg mb-2">欢迎使用 Kafkit</p>
-                  <p className="text-sm">
-                    {activeConnection 
-                      ? '在左侧 Topic 面板中选择一个 Topic 查看详情' 
-                      : '请先选择一个 Kafka 连接'}
-                  </p>
-                </div>
+                <>
+                  {/* Default workspace view when no active tab */}
+                  {isGroupsRoute ? (
+                    <div>消费组页面（待实现）</div>
+                  ) : isSettingsRoute ? (
+                    <div>设置页面（待实现）</div>
+                  ) : isConnectionsRoute ? (
+                    <div>连接管理页面（待实现）</div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <Home className="w-16 h-16 mb-4 opacity-20" />
+                      <p className="text-lg mb-2">欢迎使用 Kafkit</p>
+                      <p className="text-sm">
+                        {activeConnection 
+                          ? '在左侧 Topic 面板中选择一个 Topic 查看详情' 
+                          : '请先选择一个 Kafka 连接'}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
