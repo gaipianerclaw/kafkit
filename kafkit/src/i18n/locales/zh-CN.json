@@ -118,6 +118,8 @@
     "viewDetail": "查看详情",
     "consume": "消费消息",
     "produce": "发送消息",
+    "openConsumer": "打开消费者",
+    "openProducer": "打开生产者",
     "deleteTitle": "删除 Topic",
     "deleteWarning": "您即将删除 Topic \"{name}\"。此操作不可恢复，所有数据将永久丢失！",
     "deleteConfirmLabel": "确认删除",

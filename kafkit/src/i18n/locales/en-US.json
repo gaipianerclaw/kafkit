@@ -118,6 +118,8 @@
     "viewDetail": "View Details",
     "consume": "Consume Messages",
     "produce": "Produce Messages",
+    "openConsumer": "Open Consumer",
+    "openProducer": "Open Producer",
     "deleteTitle": "Delete Topic",
     "deleteWarning": "You are about to delete topic \"{name}\". This action cannot be undone and all data will be permanently lost!",
     "deleteConfirmLabel": "Confirm Deletion",

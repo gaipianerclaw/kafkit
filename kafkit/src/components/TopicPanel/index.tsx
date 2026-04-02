@@ -3,7 +3,10 @@
  * Similar to IDEA Kafka plugin layout
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Download, Send, ChevronLeft, ChevronRight, Folder, Server, ChevronDown, Plus, Settings } from 'lucide-react';
+import { Search, Download, Send, ChevronLeft, ChevronRight, Folder, Server, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 import { useConnectionStore, useTabStore } from '../../stores';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,6 +38,7 @@ const getService = async () => {
 
 export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { activeConnection, connections, setActiveConnection } = useConnectionStore();
   const { tabs, addTab } = useTabStore();
   const [topics, setTopics] = useState<TopicInfo[]>([]);
@@ -46,6 +50,19 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
     y: number;
     topic: TopicInfo;
   } | null>(null);
+
+  // Create topic dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newTopicName, setNewTopicName] = useState('');
+  const [newTopicPartitions, setNewTopicPartitions] = useState(1);
+  const [newTopicReplicas, setNewTopicReplicas] = useState(1);
+  const [creating, setCreating] = useState(false);
+
+  // Delete topic dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [topicToDelete, setTopicToDelete] = useState<TopicInfo | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch topics
   useEffect(() => {
@@ -121,6 +138,53 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
   const handleDoubleClick = useCallback((topicName: string) => {
     handleOpenConsumer(topicName);
   }, [handleOpenConsumer]);
+
+  // 创建 Topic
+  const handleCreateTopic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeConnection || !newTopicName.trim()) return;
+
+    setCreating(true);
+    try {
+      const tauriService = await getService();
+      await tauriService.createTopic(activeConnection, newTopicName.trim(), newTopicPartitions, newTopicReplicas);
+      setNewTopicName('');
+      setNewTopicPartitions(1);
+      setNewTopicReplicas(1);
+      setShowCreateDialog(false);
+      fetchTopics();
+    } catch (err) {
+      alert(t('topics.createError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // 删除 Topic
+  const handleDeleteClick = (topic: TopicInfo) => {
+    setTopicToDelete(topic);
+    setDeleteConfirmInput('');
+    setShowDeleteDialog(true);
+    setContextMenu(null);
+  };
+
+  const handleDeleteConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeConnection || !topicToDelete) return;
+
+    setDeleting(true);
+    try {
+      const tauriService = await getService();
+      await tauriService.deleteTopic(activeConnection, topicToDelete.name);
+      setShowDeleteDialog(false);
+      setTopicToDelete(null);
+      fetchTopics();
+    } catch (err) {
+      alert(t('topics.deleteError') + ': ' + (err instanceof Error ? err.message : t('common.unknownError')));
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Close context menu on click outside
   useEffect(() => {
@@ -210,18 +274,28 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
           </div>
         </div>
 
-        {/* Search */}
-        <div className="p-3 border-b border-border">
-          <div className="relative">
+        {/* Search and Create */}
+        <div className="p-3 border-b border-border flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder="搜索 Topic..."
+              placeholder={t('topics.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+          {activeConnection && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCreateDialog(true)}
+              title={t('topics.create')}
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          )}
         </div>
 
         {/* Topic List */}
@@ -280,7 +354,7 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
             className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
-            打开消费者
+            {t('topics.openConsumer')}
           </button>
           <button
             onClick={() => {
@@ -290,8 +364,114 @@ export function TopicPanel({ isOpen, onToggle, selectedTopic }: TopicPanelProps)
             className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
-            打开生产者
+            {t('topics.openProducer')}
           </button>
+          {!contextMenu.topic.isInternal && (
+            <>
+              <div className="border-t border-border my-1" />
+              <button
+                onClick={() => handleDeleteClick(contextMenu.topic)}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-2 text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+                {t('common.delete')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Create Topic Dialog */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold">{t('topics.createTitle')}</h2>
+            </div>
+            <form onSubmit={handleCreateTopic} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">{t('topics.name')}</label>
+                <Input
+                  value={newTopicName}
+                  onChange={e => setNewTopicName(e.target.value)}
+                  placeholder="my-topic"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t('topics.partitions')}</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={newTopicPartitions}
+                    onChange={e => setNewTopicPartitions(parseInt(e.target.value) || 1)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t('topics.replicationFactor')}</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={newTopicReplicas}
+                    onChange={e => setNewTopicReplicas(parseInt(e.target.value) || 1)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{t('topics.replicationFactorHint')}</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit" isLoading={creating}>
+                  {t('common.create')}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Topic Dialog */}
+      {showDeleteDialog && topicToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-destructive">{t('topics.deleteTitle')}</h2>
+            </div>
+            <form onSubmit={handleDeleteConfirm} className="p-6 space-y-4">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+                <p className="text-sm text-destructive">
+                  {t('topics.deleteWarning', { name: topicToDelete.name })}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">{t('topics.deleteConfirmLabel')}</label>
+                <Input
+                  value={deleteConfirmInput}
+                  onChange={e => setDeleteConfirmInput(e.target.value)}
+                  placeholder={topicToDelete.name}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-1">{t('topics.deleteConfirmHint', { name: topicToDelete.name })}</p>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  isLoading={deleting}
+                  disabled={deleteConfirmInput.trim() !== topicToDelete.name}
+                >
+                  {t('common.delete')}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </>
