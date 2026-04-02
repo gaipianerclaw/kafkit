@@ -314,7 +314,7 @@ export function FileMode({ connection, topic }: FileModeProps) {
     } finally {
       setIsSending(false);
     }
-  }, [file, detectedFormat, format, columnMapping, compression, strategy, connection, topic, csvHeaders]);
+  }, [file, detectedFormat, format, columnMapping, compression, strategy, connection, topic, csvHeaders, valueTimestampConfig]);
 
   const handleCancel = useCallback(() => {
     abortRef.current = true;
