@@ -752,6 +752,9 @@ impl ConnectionManager {
         producer_config.set("retries", "3");
         producer_config.set("max.in.flight.requests.per.connection", "5");
         producer_config.set("compression.type", "snappy");
+        // 使用轮询分区策略，确保消息均匀分布到各个分区
+        // 注意：如果消息有 key，仍然会基于 key 的 hash 分配到固定分区
+        producer_config.set("partitioner", "roundrobin");
         
         let producer: FutureProducer = producer_config.create()
             .map_err(|e| AppError::KafkaError(format!("Failed to create producer: {}", e)))?;
