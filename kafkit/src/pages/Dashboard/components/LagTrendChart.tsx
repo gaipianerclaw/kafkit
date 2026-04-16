@@ -6,7 +6,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
@@ -34,7 +33,7 @@ function getGroupColor(index: number): string {
   return COLORS[index % COLORS.length];
 }
 
-// Custom tooltip to avoid z-index issues and improve styling
+// Custom tooltip
 function CustomTooltip({
   active,
   payload,
@@ -46,14 +45,10 @@ function CustomTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  // Sort by value desc
   const sorted = [...payload].sort((a, b) => b.value - a.value);
 
   return (
-    <div
-      className="rounded-lg border bg-card px-3 py-2 shadow-lg"
-      style={{ zIndex: 9999 }}
-    >
+    <div className="rounded-lg border bg-card px-3 py-2 shadow-lg">
       <p className="mb-1 text-xs font-medium text-muted-foreground">
         {label ? formatTime(label) : ''}
       </p>
@@ -106,7 +101,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
     return Array.from(byTimestamp.values()).sort((a, b) => a.timestamp - b.timestamp);
   }, [data]);
 
-  const handleLegendClick = (groupId: string) => {
+  const toggleGroup = (groupId: string) => {
     setHiddenGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -127,56 +122,71 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
   }
 
   return (
-    <div className="h-full min-h-[200px] bg-card rounded-lg border p-4">
-      <h3 className="text-sm font-medium mb-2">{t('dashboard.chart.title')}</h3>
-      <ResponsiveContainer width="100%" height="85%" minHeight={160}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 56, right: 16, bottom: 24, left: 0 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={(ts) => formatTime(ts as number)}
-            type="number"
-            domain={['dataMin', 'dataMax']}
-            tick={{ fontSize: 11 }}
-            stroke="hsl(var(--muted-foreground))"
-          />
-          <YAxis
-            tickFormatter={(val) => formatNumber(val as number)}
-            tick={{ fontSize: 11 }}
-            width={56}
-            stroke="hsl(var(--muted-foreground))"
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            verticalAlign="top"
-            align="left"
-            height={52}
-            iconType="circle"
-            wrapperStyle={{
-              cursor: 'pointer',
-              fontSize: '11px',
-              paddingBottom: '16px',
-            }}
-            onClick={(e) => handleLegendClick(e.value as string)}
-          />
-          {allGroups.map((groupId, index) => (
-            <Line
-              key={groupId}
-              type="monotone"
-              dataKey={groupId}
-              stroke={getGroupColor(index)}
-              strokeWidth={hiddenGroups.has(groupId) ? 0 : 2}
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
-              hide={hiddenGroups.has(groupId)}
-              connectNulls
+    <div className="h-full bg-card rounded-lg border p-4 flex flex-col">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <h3 className="text-sm font-medium shrink-0">{t('dashboard.chart.title')}</h3>
+        {/* Custom legend */}
+        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1.5 flex-1">
+          {allGroups.map((groupId, index) => {
+            const isHidden = hiddenGroups.has(groupId);
+            return (
+              <button
+                key={groupId}
+                onClick={() => toggleGroup(groupId)}
+                className={`flex items-center gap-1.5 text-xs transition-opacity ${
+                  isHidden ? 'opacity-40 line-through' : 'opacity-100'
+                }`}
+                title={groupId}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: getGroupColor(index) }}
+                />
+                <span className="max-w-[120px] truncate">{groupId}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 4, right: 16, bottom: 8, left: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={(ts) => formatTime(ts as number)}
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              tick={{ fontSize: 11 }}
+              stroke="hsl(var(--muted-foreground))"
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              tickFormatter={(val) => formatNumber(val as number)}
+              tick={{ fontSize: 11 }}
+              width={56}
+              stroke="hsl(var(--muted-foreground))"
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {allGroups.map((groupId, index) => (
+              <Line
+                key={groupId}
+                type="monotone"
+                dataKey={groupId}
+                stroke={getGroupColor(index)}
+                strokeWidth={hiddenGroups.has(groupId) ? 0 : 2}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0 }}
+                hide={hiddenGroups.has(groupId)}
+                connectNulls
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-full p-4 gap-4 overflow-hidden">
+    <div className="flex flex-col h-full p-3 gap-3 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>
@@ -79,7 +79,7 @@ export function DashboardPage() {
       <StatCards groups={groups} isLoading={isLoading} />
 
       {/* Trend Chart */}
-      <div className="shrink-0 h-64">
+      <div className="shrink-0 h-80">
         <LagTrendChart data={trendData} />
       </div>
 
