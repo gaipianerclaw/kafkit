@@ -63,7 +63,7 @@ export function useDashboardData(
       return;
     }
 
-    console.log(`[Dashboard] Fetch triggered by: ${trigger}`);
+    // Debug logging removed
 
     try {
       // Only show loading spinner on initial load or manual refresh
@@ -84,8 +84,7 @@ export function useDashboardData(
               groupId: group.groupId,
             });
             return enrichGroupData(group, lagData);
-          } catch (err) {
-            console.error(`[Dashboard] Failed to fetch lag for ${group.groupId}:`, err);
+          } catch (_err) {
             return enrichGroupData(group, []);
           }
         })
@@ -114,7 +113,7 @@ export function useDashboardData(
         };
       });
     } catch (err) {
-      console.error('[Dashboard] Failed to fetch dashboard data:', err);
+      // Silent error handling for auto-refresh; error state is set below
       if (isMounted.current) {
         setState((prev) => ({
           ...prev,
