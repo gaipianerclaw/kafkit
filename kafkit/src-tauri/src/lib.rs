@@ -49,7 +49,7 @@ pub fn run() {
             let app_handle = app.handle().clone();
             
             // 记录应用启动日志
-            log::info!("Kafkit application starting - version 1.0.5");
+            log::info!("Kafkit application starting - version 1.0.6");
             log::debug!("Log directory: {:?}", app_handle.path().app_log_dir());
             
             let config_store = Arc::new(Mutex::new(ConfigStore::new(app_handle.clone())));

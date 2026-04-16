@@ -88,7 +88,7 @@ export function SettingsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('settings.version')}</span>
-              <span className="font-mono">1.0.5</span>
+              <span className="font-mono">1.0.6</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('settings.kafkaClient')}</span>

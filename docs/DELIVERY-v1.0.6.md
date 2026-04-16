@@ -18,7 +18,7 @@
 | **文档** | `README.md` | 安装说明更新 |
 | **代码** | `kafkit/src/pages/Dashboard/` | 监控仪表盘页面 |
 | **代码** | `kafkit/src-tauri/tauri.conf.json` | Windows 安装修复配置 |
-| **代码** | `kafkit/src-tauri/src/services.rs` | 消费延迟查询修复 |
+| **代码** | `kafkit/src-tauri/src/services.rs` | 消费延迟查询修复、客户端缓存 |
 | **代码** | `kafkit/src/i18n/locales/*.json` | 国际化资源 |
 | **测试** | `kafkit/src/**/__tests__/*` | 新增单元测试 |
 
@@ -29,10 +29,10 @@
 ### 2.1 新增功能：消费者监控仪表盘
 
 - **全局统计卡片**: 实时显示总消费组数、健康状态分布、总 Lag 数量
-- **Lag 趋势图**: 展示最近 10 分钟各消费组的 Lag 变化曲线
+- **Lag 趋势图**: 展示最近 10 分钟各消费组的 Lag 变化曲线（自定义图例，全组显示）
 - **消费组列表**: 支持按 Lag 排序、按状态筛选、按 Group ID 搜索
 - **分区级详情**: 点击行展开查看各 Topic-Partition 的 Current Offset / Log End Offset / Lag
-- **自动刷新**: 10 秒间隔自动刷新，支持暂停/继续
+- **自动刷新**: 10 秒间隔自动刷新，支持暂停/继续/手动刷新
 
 ### 2.2 Bug 修复：Windows 10 安装失败
 
@@ -42,9 +42,22 @@
 
 ### 2.3 Bug 修复：消费组 Lag 查询为空
 
-- **根因**: `get_consumer_lag` 使用无 `group.id` 的通用 client 查询 committed offsets，导致永远返回空
-- **修复**: 为每个消费组创建带 `group.id` 的专属 BaseConsumer 进行查询
+- **根因 1**: `get_consumer_lag` 使用无 `group.id` 的通用 client 查询 committed offsets，导致永远返回空
+- **根因 2**: `get_client()` 缓存逻辑有 bug，从未执行 `insert`，导致每个 API 都新建连接
+- **修复**: 为每个消费组创建带 `group.id` 的专属 consumer，并正确缓存复用
 - **附加修复**: 正确处理 `Offset::Invalid`，避免未消费 topic 产生虚假巨大 lag
+
+### 2.4 Bug 修复：远程集群 BrokerTransportFailure
+
+- **根因**:  dashboard 每 10 秒刷新时，7 个消费组 × 新建 consumer × 无缓存 = 连接快速耗尽
+- **修复**: lag query consumer 增加 `(connection, group)` 级别缓存，跨刷新周期复用
+
+### 2.5 体验优化
+
+- 图表自定义图例移出绘图区，显示全部消费组，支持点击切换显隐
+- `timeAgo` 完全国际化（"刚刚"/"X秒前"等）
+- 侧边栏菜单顺序调整为：Topic 管理 → 监控仪表盘 → 消费组
+- `Unknown` 状态增加悬停提示说明原因
 
 ---
 
@@ -80,7 +93,7 @@ npm run tauri:build
 
 由于安装包不再自动安装 WebView2，用户需确保系统已安装 WebView2 Runtime：
 - Windows 11: 通常已预装
-- Windows 10: 如未安装，请从 [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) 下载
+- Windows 10: 如未安装，请从 [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) 下载 Evergreen Standalone Installer
 
 ---
 
@@ -88,19 +101,12 @@ npm run tauri:build
 
 ### 4.1 监控仪表盘
 
-1. 在左侧导航栏点击 **"监控仪表盘"**（Activity 图标）
+1. 在左侧导航栏点击 **"监控仪表盘"**（Activity 图标，位于 Topic 管理下方）
 2. 页面自动加载当前连接的所有消费组及 Lag 数据
 3. 数据每 10 秒自动刷新，可点击右上角 **暂停/继续/刷新**
-4. **统计卡片**:
-   - 总消费组数：当前连接下的消费组总数
-   - 健康状态：按 Lag 阈值分类（健康/警告/危险）
-   - 总 Lag：所有消费组 Lag 之和
-5. **趋势图**: 鼠标悬停可查看各消费组在对应时间点的 Lag 值
-6. **消费组列表**:
-   - 点击表头可排序
-   - 使用搜索框按 Group ID 过滤
-   - 使用下拉框按健康状态筛选
-   - 点击行可展开查看分区级详情
+4. **统计卡片**: 总消费组数、健康状态分布（健康/警告/危险）、总 Lag
+5. **趋势图**: 鼠标悬停查看各消费组对应时间点的 Lag 值；点击图例可隐藏/显示某条线
+6. **消费组列表**: 支持排序、筛选、搜索；点击行展开查看分区级详情
 
 ### 4.2 健康状态阈值
 
@@ -135,23 +141,44 @@ Test Files  18 passed (18)
 
 ---
 
-## 7. 后续建议
+## 7. 功能重叠说明（仪表盘 vs 消费者组）
 
-| 版本 | 建议优化项 |
-|------|-----------|
-| v1.0.7 | 消息消费过滤（按 Key/Value 正则过滤） |
-| v1.0.7 | 生产者消息模板保存 |
-| v1.0.7 | 连接健康状态后台检测 + 状态指示灯 |
-| 后续 | 数据导出增强（Parquet/Avro） |
+**结论：保留消费者组页面，职责分离**
+
+| 页面 | 职责 | 核心功能 |
+|------|------|---------|
+| **监控仪表盘** | 监控（Monitoring） | 只读、实时、全局视图、趋势图 |
+| **消费者组** | 管理（Management） | 偏移量重置（Earliest/Latest/Offset/Timestamp） |
+
+偏移量重置是高频运维操作，不应与只读监控混在同一页面，避免误触风险。
 
 ---
 
 ## 8. 分支状态
 
-当前所有改动已提交至分支 `feature/v1.0.6-consumer-monitoring`，可直接用于：
+当前所有改动已提交至分支 `feature/v1.0.6-consumer-monitoring`，可直接：
 - 合并到 `main` / `develop`
 - 触发 CI/CD 构建发布包
 
 ---
 
-**交付完成，等待验收。**
+## 9. 关键提交记录
+
+```
+48a4b94 chore(dashboard): remove frontend console debug logs
+13584ba fix(backend): add client caching to prevent BrokerTransportFailure
+8bc1658 fix(dashboard): fix pause/refresh buttons and explain Unknown state
+373db3c fix(dashboard): show all groups in chart legend, i18n time-ago, reorder nav
+3aef1ae style(dashboard): improve LagTrendChart styling and fix tooltip overlay
+f8ce7aa fix(backend): create dedicated consumer with group.id for lag queries
+f9d9643 fix(backend): resolve empty lag data for consumer groups
+27479aa fix(backend): increase timeout and expose errors for consumer groups
+b9109a9 fix: add Skeleton component and fix tests
+dffabfe test(dashboard): add unit tests and update README
+9e9d1ce feat(dashboard): implement consumer monitoring dashboard
+c645be8 fix(windows): skip WebView2 installation in MSI bundler
+```
+
+---
+
+**v1.0.6 开发任务已完成，等待最终验收确认。**
