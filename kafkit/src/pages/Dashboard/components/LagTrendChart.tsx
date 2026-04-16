@@ -14,7 +14,7 @@ import type { LagDataPoint, DashboardConsumerGroup, ChartDataPoint } from '../..
 
 interface LagTrendChartProps {
   data: LagDataPoint[];
-  groups: DashboardConsumerGroup[];
+  groups?: DashboardConsumerGroup[];
 }
 
 // Color palette for chart lines
@@ -30,7 +30,7 @@ function getGroupColor(index: number): string {
   return COLORS[index % COLORS.length];
 }
 
-export function LagTrendChart({ data, groups }: LagTrendChartProps) {
+export function LagTrendChart({ data }: LagTrendChartProps) {
   const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 

@@ -143,8 +143,8 @@ export interface ConsumerGroupInfo {
 export interface PartitionLag {
   topic: string;
   partition: number;
-  current_offset: number;
-  log_end_offset: number;
+  currentOffset: number;
+  logEndOffset: number;
   lag: number;
 }
 

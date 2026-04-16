@@ -50,7 +50,7 @@ export function useDashboardData(
 
   // Use ref to track mounted state
   const isMounted = useRef(true);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   interface DashboardState {
     groups: DashboardConsumerGroup[];
@@ -70,9 +70,11 @@ export function useDashboardData(
       setState((prev) => ({ ...prev, isLoading: prev.groups.length === 0 }));
 
       // 1. Fetch all consumer groups
+      console.log('[Dashboard] Fetching consumer groups for connection:', connectionId);
       const groupList = await invoke<ConsumerGroupInfo[]>('list_consumer_groups', {
         connectionId,
       });
+      console.log('[Dashboard] Received groups:', groupList.length, groupList);
 
       // 2. Fetch lag for each group (parallel)
       const groupsWithLag = await Promise.all(

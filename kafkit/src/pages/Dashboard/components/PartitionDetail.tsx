@@ -59,10 +59,10 @@ export function PartitionDetail({ partitions }: PartitionDetailProps) {
                   <TableCell className="font-medium">{partition.topic}</TableCell>
                   <TableCell>{partition.partition}</TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
-                    {formatNumberExact(partition.current_offset)}
+                    {formatNumberExact(partition.currentOffset)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
-                    {formatNumberExact(partition.log_end_offset)}
+                    {formatNumberExact(partition.logEndOffset)}
                   </TableCell>
                   <TableCell className={`text-right font-mono ${getLagClass(partition.lag)}`}>
                     {formatNumber(partition.lag)}

@@ -962,13 +962,14 @@ impl ConnectionManager {
         
         let client = self.get_client(connection).await?;
         
-        // 获取消费组列表 - 使用较短的超时时间
-        let groups = match client.fetch_group_list(None, Duration::from_secs(5)) {
+        // 获取消费组列表 - 增加超时时间以支持远程集群
+        let groups = match client.fetch_group_list(None, Duration::from_secs(15)) {
             Ok(g) => g,
             Err(e) => {
-                println!("[Kafkit] Failed to fetch consumer groups: {}", e);
-                // 返回空列表而不是错误，避免前端闪退
-                return Ok(vec![]);
+                let err_msg = format!("Failed to fetch consumer groups: {}", e);
+                println!("[Kafkit] {}", err_msg);
+                log::error!("{}", err_msg);
+                return Err(AppError::KafkaError(err_msg));
             }
         };
         
@@ -1060,8 +1061,8 @@ impl ConnectionManager {
         let mut result = Vec::new();
         let mut processed_partitions = std::collections::HashSet::new();
         
-        // 首先检查消费组是否存在 - 使用较短的超时时间
-        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(3)) {
+        // 首先检查消费组是否存在 - 增加超时时间
+        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(10)) {
             Ok(g) => g,
             Err(e) => {
                 let error_msg = format!("{}", e);
@@ -1070,9 +1071,10 @@ impl ConnectionManager {
                     log::warn!("Consumer group '{}' not found or expired", group_id);
                     return Ok(vec![]);
                 }
-                println!("[Kafkit] Failed to fetch group info: {}", e);
-                log::error!("Failed to fetch consumer group info for {}: {}", group_id, e);
-                return Ok(vec![]);
+                let err_msg = format!("Failed to fetch consumer group info for {}: {}", group_id, e);
+                println!("[Kafkit] {}", err_msg);
+                log::error!("{}", err_msg);
+                return Err(AppError::KafkaError(err_msg));
             }
         };
         
@@ -1087,9 +1089,10 @@ impl ConnectionManager {
         let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
             Ok(m) => m,
             Err(e) => {
-                println!("[Kafkit] Failed to fetch metadata: {}", e);
-                log::error!("Failed to fetch metadata for consumer lag: {}", e);
-                return Ok(vec![]);
+                let err_msg = format!("Failed to fetch metadata for consumer lag: {}", e);
+                println!("[Kafkit] {}", err_msg);
+                log::error!("{}", err_msg);
+                return Err(AppError::KafkaError(err_msg));
             }
         };
         

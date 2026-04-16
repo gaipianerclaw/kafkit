@@ -12,7 +12,7 @@ import type { SortConfig, HealthStatus } from '../../types/dashboard';
 
 export function DashboardPage() {
   const { t } = useTranslation();
-  const currentConnection = useConnectionStore((state) => state.currentConnection);
+  const { activeConnection, connections } = useConnectionStore();
   
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'totalLag', direction: 'desc' });
@@ -21,7 +21,7 @@ export function DashboardPage() {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   const { groups, trendData, isLoading, error, lastUpdated, refresh } = useDashboardData(
-    currentConnection?.id || '',
+    activeConnection || '',
     autoRefresh
   );
 
@@ -29,7 +29,10 @@ export function DashboardPage() {
     setExpandedGroup((prev) => (prev === groupId ? null : groupId));
   }, []);
 
-  if (!currentConnection) {
+  // Get active connection name for display
+  const activeConnectionName = connections.find(c => c.id === activeConnection)?.name || activeConnection;
+
+  if (!activeConnection) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Activity className="w-12 h-12 text-muted-foreground mb-4" />
@@ -46,7 +49,7 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            {t('dashboard.connection')}: {currentConnection.name}
+            {t('dashboard.connection')}: {activeConnectionName}
           </p>
         </div>
         <RefreshControl
@@ -77,7 +80,7 @@ export function DashboardPage() {
 
       {/* Trend Chart */}
       <div className="shrink-0 h-64">
-        <LagTrendChart data={trendData} groups={groups} />
+        <LagTrendChart data={trendData} />
       </div>
 
       {/* Consumer Group Table */}
