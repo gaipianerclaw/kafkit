@@ -132,7 +132,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
       <ResponsiveContainer width="100%" height="85%" minHeight={160}>
         <LineChart
           data={chartData}
-          margin={{ top: 36, right: 16, bottom: 24, left: 0 }}
+          margin={{ top: 56, right: 16, bottom: 24, left: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
           <XAxis
@@ -153,7 +153,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
           <Legend
             verticalAlign="top"
             align="left"
-            height={36}
+            height={52}
             iconType="circle"
             wrapperStyle={{
               cursor: 'pointer',
