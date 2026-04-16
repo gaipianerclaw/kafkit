@@ -8,16 +8,15 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  CartesianGrid,
 } from 'recharts';
 import { formatNumber, formatTime } from '../../../utils/formatters';
-import type { LagDataPoint, DashboardConsumerGroup, ChartDataPoint } from '../../../types/dashboard';
+import type { LagDataPoint, ChartDataPoint } from '../../../types/dashboard';
 
 interface LagTrendChartProps {
   data: LagDataPoint[];
-  groups?: DashboardConsumerGroup[];
 }
 
-// Color palette for chart lines
 const COLORS = [
   '#3b82f6', // blue-500
   '#10b981', // emerald-500
@@ -30,11 +29,53 @@ function getGroupColor(index: number): string {
   return COLORS[index % COLORS.length];
 }
 
+// Custom tooltip to avoid z-index issues and improve styling
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: number;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  // Sort by value desc
+  const sorted = [...payload].sort((a, b) => b.value - a.value);
+
+  return (
+    <div
+      className="rounded-lg border bg-card px-3 py-2 shadow-lg"
+      style={{ zIndex: 9999 }}
+    >
+      <p className="mb-1 text-xs font-medium text-muted-foreground">
+        {label ? formatTime(label) : ''}
+      </p>
+      <div className="space-y-0.5">
+        {sorted.map((entry) => (
+          <div key={entry.name} className="flex items-center gap-2 text-xs">
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="max-w-[180px] truncate" title={entry.name}>
+              {entry.name}
+            </span>
+            <span className="ml-auto font-mono font-medium">
+              {formatNumber(entry.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LagTrendChart({ data }: LagTrendChartProps) {
   const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
-  // Get top 5 groups by max lag for default display
   const topGroups = useMemo(() => {
     const groupMaxLag = new Map<string, number>();
     data.forEach((point) => {
@@ -48,11 +89,8 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
       .map(([groupId]) => groupId);
   }, [data]);
 
-  // Transform data for Recharts
   const chartData = useMemo(() => {
-    // Group by timestamp
     const byTimestamp = new Map<number, ChartDataPoint>();
-    
     data.forEach((point) => {
       if (!byTimestamp.has(point.timestamp)) {
         byTimestamp.set(point.timestamp, { timestamp: point.timestamp });
@@ -88,31 +126,37 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
     <div className="h-full min-h-[200px] bg-card rounded-lg border p-4">
       <h3 className="text-sm font-medium mb-2">{t('dashboard.chart.title')}</h3>
       <ResponsiveContainer width="100%" height="85%" minHeight={160}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 16, bottom: 24, left: 0 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
           <XAxis
             dataKey="timestamp"
             tickFormatter={(ts) => formatTime(ts as number)}
             type="number"
             domain={['dataMin', 'dataMax']}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 11 }}
+            stroke="hsl(var(--muted-foreground))"
           />
           <YAxis
             tickFormatter={(val) => formatNumber(val as number)}
-            tick={{ fontSize: 12 }}
-            width={60}
+            tick={{ fontSize: 11 }}
+            width={56}
+            stroke="hsl(var(--muted-foreground))"
           />
-          <Tooltip
-            labelFormatter={(ts) => formatTime(ts as number)}
-            formatter={(val, name) => [formatNumber(val as number), name as string]}
-            contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '6px',
-            }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Legend
+            verticalAlign="bottom"
+            align="left"
+            height={24}
+            iconType="circle"
+            wrapperStyle={{
+              cursor: 'pointer',
+              fontSize: '11px',
+              paddingTop: '8px',
+            }}
             onClick={(e) => handleLegendClick(e.value as string)}
-            wrapperStyle={{ cursor: 'pointer' }}
           />
           {topGroups.map((groupId, index) => (
             <Line
@@ -120,8 +164,9 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
               type="monotone"
               dataKey={groupId}
               stroke={getGroupColor(index)}
-              strokeWidth={2}
+              strokeWidth={hiddenGroups.has(groupId) ? 0 : 2}
               dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
               hide={hiddenGroups.has(groupId)}
               connectNulls
             />
