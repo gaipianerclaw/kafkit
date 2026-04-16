@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { Input } from '../../../components/ui/Input';
@@ -175,9 +175,8 @@ export function ConsumerGroupTable({
               </TableRow>
             ) : (
               filteredGroups.map((group) => (
-                <>
+                <Fragment key={group.groupId}>
                   <TableRow
-                    key={group.groupId}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => onToggleExpand(group.groupId)}
                   >
@@ -207,7 +206,7 @@ export function ConsumerGroupTable({
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </TableBody>

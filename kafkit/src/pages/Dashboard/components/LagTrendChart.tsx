@@ -78,16 +78,16 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-card rounded-lg border border-dashed">
+      <div className="h-full min-h-[200px] flex items-center justify-center bg-card rounded-lg border border-dashed">
         <p className="text-muted-foreground text-sm">{t('dashboard.chart.noData')}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-card rounded-lg border p-4">
+    <div className="h-full min-h-[200px] bg-card rounded-lg border p-4">
       <h3 className="text-sm font-medium mb-2">{t('dashboard.chart.title')}</h3>
-      <ResponsiveContainer width="100%" height="85%">
+      <ResponsiveContainer width="100%" height="85%" minHeight={160}>
         <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
           <XAxis
             dataKey="timestamp"
