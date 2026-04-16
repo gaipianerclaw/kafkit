@@ -143,8 +143,8 @@ export interface ConsumerGroupInfo {
 export interface PartitionLag {
   topic: string;
   partition: number;
-  currentOffset: number;
-  logEndOffset: number;
+  current_offset: number;
+  log_end_offset: number;
   lag: number;
 }
 
@@ -162,3 +162,7 @@ export interface AppSettings {
   defaultPageSize: number;
   autoCheckUpdate: boolean;
 }
+
+// ================= Dashboard 类型 =================
+
+export * from './dashboard';

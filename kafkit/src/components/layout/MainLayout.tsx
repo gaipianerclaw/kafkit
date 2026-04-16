@@ -2,7 +2,8 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { 
   Home,
   Users, 
-  Settings
+  Settings,
+  Activity
 } from 'lucide-react';
 import { useConnectionStore, useTabStore } from '../../stores';
 import { useEffect, useState, useCallback } from 'react';
@@ -17,6 +18,7 @@ import { TopicPanel } from '../TopicPanel';
 import { SettingsPage } from '../../pages/Settings/SettingsPage';
 import { ConnectionListPage } from '../../pages/Connection/ConnectionListPage';
 import { GroupListPage } from '../../pages/Groups/GroupListPage';
+import { DashboardPage } from '../../pages/Dashboard';
 
 
 export function MainLayout() {
@@ -47,6 +49,7 @@ export function MainLayout() {
   const isSettingsRoute = location.pathname === '/main/settings';
   const isConnectionsRoute = location.pathname === '/main/connections';
   const isTopicsRoute = location.pathname === '/main/topics';
+  const isDashboardRoute = location.pathname === '/main/dashboard';
 
   // Global keyboard shortcuts
   const handleRefresh = useCallback(() => {
@@ -79,6 +82,19 @@ export function MainLayout() {
 
         {/* Navigation Icons */}
         <nav className="flex-1 py-3 space-y-2 overflow-y-auto">
+          {/* Dashboard */}
+          <button
+            onClick={() => handleNavClick('/main/dashboard')}
+            className={`w-full flex items-center justify-center py-3 transition-colors ${
+              isDashboardRoute
+                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            title={t('nav.dashboard')}
+          >
+            <Activity className="w-5 h-5" />
+          </button>
+
           {/* Home */}
           <button
             onClick={() => handleNavClick('/main/topics')}
@@ -145,7 +161,9 @@ export function MainLayout() {
           {/* Show page content when no active tab */}
           {!hasActiveTab && (
             <div className="absolute inset-0 w-full h-full bg-background z-10">
-              {isGroupsRoute ? (
+              {isDashboardRoute ? (
+                <DashboardPage />
+              ) : isGroupsRoute ? (
                 <GroupListPage />
               ) : isSettingsRoute ? (
                 <SettingsPage />

@@ -45,6 +45,7 @@
     "connections": "Connections",
     "topics": "Topics",
     "consumerGroups": "Consumer Groups",
+    "dashboard": "Monitoring Dashboard",
     "settings": "Settings",
     "help": "Help"
   },
@@ -448,6 +449,61 @@
     },
     "rowsLeft": "{count} more rows",
     "itemsLeft": "{count} more items"
+  },
+  "dashboard": {
+    "title": "Consumer Monitoring Dashboard",
+    "noConnection": "No Connection Selected",
+    "selectConnection": "Please select a Kafka connection first",
+    "connection": "Current Connection",
+    "updated": "Updated {time}",
+    "pause": "Pause",
+    "resume": "Resume",
+    "refresh": "Refresh",
+    "stats": {
+      "totalGroups": "Total Groups",
+      "healthStatus": "Health Status",
+      "healthSubtitle": "Healthy/Warning/Critical",
+      "totalLag": "Total Lag"
+    },
+    "health": {
+      "healthy": "Healthy",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "chart": {
+      "title": "Lag Trend (Last 10 Minutes)",
+      "noData": "No trend data available"
+    },
+    "table": {
+      "search": "Search consumer groups...",
+      "groupId": "Group ID",
+      "state": "State",
+      "members": "Members",
+      "topics": "Topics",
+      "lag": "Lag",
+      "noResults": "No matching results"
+    },
+    "filter": {
+      "all": "All Status"
+    },
+    "partition": {
+      "title": "Partition Details",
+      "topic": "Topic",
+      "partition": "Partition",
+      "currentOffset": "Current Offset",
+      "logEndOffset": "Log End Offset",
+      "lag": "Lag",
+      "noData": "No partition data"
+    },
+    "empty": {
+      "title": "No Consumer Groups",
+      "description": "There are no consumer groups in the current Kafka cluster, or you don't have permission to view them.",
+      "refresh": "Reload"
+    },
+    "error": {
+      "title": "Load Failed",
+      "retry": "Retry"
+    }
   },
   "consumerGroups": {
     "title": "Consumer Groups",
