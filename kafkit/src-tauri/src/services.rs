@@ -19,8 +19,10 @@ use rdkafka::message::{Header, OwnedHeaders};
 
 // 连接池 - 存储已创建的客户端
 pub struct ConnectionManager {
-    clients: Mutex<HashMap<String, BaseConsumer>>,
+    clients: Mutex<HashMap<String, Arc<BaseConsumer>>>,
     producers: Mutex<HashMap<String, FutureProducer>>,
+    // Lag 查询 consumer 缓存: (connection_id, group_id) -> BaseConsumer
+    lag_consumers: Arc<std::sync::Mutex<HashMap<(String, String), BaseConsumer>>>,
     // 轮询计数器: (connection_id, topic) -> next_partition
     roundrobin_counters: Mutex<HashMap<(String, String), i32>>,
 }
@@ -30,6 +32,7 @@ impl ConnectionManager {
         Self {
             clients: Mutex::new(HashMap::new()),
             producers: Mutex::new(HashMap::new()),
+            lag_consumers: Arc::new(std::sync::Mutex::new(HashMap::new())),
             roundrobin_counters: Mutex::new(HashMap::new()),
         }
     }
@@ -165,7 +168,7 @@ impl ConnectionManager {
     }
 
     /// 获取或创建 Kafka 客户端
-    async fn get_client(&self, connection: &Connection) -> Result<BaseConsumer, AppError> {
+    async fn get_client(&self, connection: &Connection) -> Result<Arc<BaseConsumer>, AppError> {
         let mut clients = self.clients.lock().await;
         
         // 检查是否已有缓存的客户端
@@ -174,8 +177,7 @@ impl ConnectionManager {
             match client.fetch_metadata(None, Duration::from_secs(5)) {
                 Ok(_) => {
                     println!("[Kafkit] Using cached client for connection: {}", connection.id);
-                    // 需要克隆客户端，但 BaseConsumer 不能 Clone，所以重新创建
-                    // 移除旧客户端，创建新的
+                    return Ok(client.clone());
                 }
                 Err(e) => {
                     println!("[Kafkit] Cached client stale: {}, reconnecting", e);
@@ -196,9 +198,8 @@ impl ConnectionManager {
         
         println!("[Kafkit] Successfully connected to Kafka cluster");
         
-        // 由于不能 Clone，我们存储客户端并返回（需要处理生命周期）
-        // 实际上 rdkafka 的 BaseConsumer 是线程安全的，可以通过 Arc 共享
-        // 但这里为了简单，我们每次都创建新客户端，不缓存
+        let client = Arc::new(client);
+        clients.insert(connection.id.clone(), client.clone());
         
         Ok(client)
     }
@@ -1032,49 +1033,25 @@ impl ConnectionManager {
     }
 
 
-    /// 获取 Consumer Group 的消费延迟 (Lag)
-    /// 内部使用 spawn_blocking 包装，因为 rdkafka 的一些类型不是 Send
-    pub async fn get_consumer_lag(
-        &self,
-        connection: &Connection,
-        group_id: &str,
-    ) -> Result<Vec<PartitionLag>, AppError> {
-        println!("[Kafkit] Getting consumer lag for group: {}", group_id);
-        
-        // 创建带 group.id 的配置（查询 committed offsets 必需）
-        let mut config = Self::create_client_config(connection)?;
-        config.set("group.id", group_id);
-        config.set("client.id", &format!("kafkit-lag-{}-{}", connection.id, group_id));
-        config.set("enable.auto.commit", "false");
-        
-        let group_id = group_id.to_string();
-        
-        // 使用 spawn_blocking 包装同步代码，避免非 Send 类型跨越 await
-        let result = tokio::task::spawn_blocking(move || {
-            Self::get_consumer_lag_sync(config, &group_id)
-        }).await.map_err(|e| AppError::Other(format!("Task join error: {}", e)))?;
-        
-        result
+    /// 创建 Lag 查询用的 BaseConsumer
+    fn create_lag_consumer(config: &ClientConfig, group_id: &str) -> Result<BaseConsumer, AppError> {
+        let client: BaseConsumer = config.create()
+            .map_err(|e| {
+                let err_msg = format!("Failed to create lag query client for {}: {}", group_id, e);
+                println!("[Kafkit] {}", err_msg);
+                log::error!("{}", err_msg);
+                AppError::KafkaError(err_msg)
+            })?;
+        Ok(client)
     }
-    
-    /// 同步版本的获取 Consumer Lag（用于 spawn_blocking 内部）
-    fn get_consumer_lag_sync(
-        config: ClientConfig,
+
+    /// 同步版本查询 lag 的核心逻辑
+    fn query_consumer_lag_sync(
+        client: &BaseConsumer,
         group_id: &str,
     ) -> Result<Vec<PartitionLag>, AppError> {
         let mut result = Vec::new();
         let mut processed_partitions = std::collections::HashSet::new();
-        
-        // 创建带 group.id 的 consumer（查询 committed offsets 必需）
-        let client: BaseConsumer = match config.create() {
-            Ok(c) => c,
-            Err(e) => {
-                let err_msg = format!("Failed to create lag query client for {}: {}", group_id, e);
-                println!("[Kafkit] {}", err_msg);
-                log::error!("{}", err_msg);
-                return Err(AppError::KafkaError(err_msg));
-            }
-        };
         
         // 获取集群元数据
         let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
@@ -1104,7 +1081,7 @@ impl ConnectionManager {
                 }
                 
                 // 获取 committed offsets，带重试逻辑
-                let committed = match Self::fetch_committed_with_retry_sync(&client, &tpl, 3) {
+                let committed = match Self::fetch_committed_with_retry_sync(client, &tpl, 3) {
                     Ok(c) => c,
                     Err(e) => {
                         let error_msg = format!("{}", e);
@@ -1172,6 +1149,51 @@ impl ConnectionManager {
         
         println!("[Kafkit] Found {} partition lag entries for group '{}'", result.len(), group_id);
         Ok(result)
+    }
+
+    /// 获取 Consumer Group 的消费延迟 (Lag)
+    pub async fn get_consumer_lag(
+        &self,
+        connection: &Connection,
+        group_id: &str,
+    ) -> Result<Vec<PartitionLag>, AppError> {
+        println!("[Kafkit] Getting consumer lag for group: {}", group_id);
+        
+        // 创建带 group.id 的配置（查询 committed offsets 必需）
+        let mut config = Self::create_client_config(connection)?;
+        config.set("group.id", group_id);
+        config.set("client.id", &format!("kafkit-lag-{}-{}", connection.id, group_id));
+        config.set("enable.auto.commit", "false");
+        
+        let cache_key = (connection.id.clone(), group_id.to_string());
+        let group_id = group_id.to_string();
+        let lag_consumers = self.lag_consumers.clone();
+        
+        // 使用 spawn_blocking 包装同步代码
+        let result = tokio::task::spawn_blocking(move || {
+            let mut consumers = lag_consumers.lock().unwrap();
+            
+            let client = if let Some(cached) = consumers.remove(&cache_key) {
+                if cached.fetch_metadata(None, Duration::from_secs(5)).is_ok() {
+                    println!("[Kafkit] Using cached lag consumer for group: {}", group_id);
+                    cached
+                } else {
+                    println!("[Kafkit] Cached lag consumer stale for group: {}, recreating", group_id);
+                    Self::create_lag_consumer(&config, &group_id)?
+                }
+            } else {
+                Self::create_lag_consumer(&config, &group_id)?
+            };
+            
+            let result = Self::query_consumer_lag_sync(&client, &group_id);
+            
+            // 缓存 consumer 供下次使用
+            consumers.insert(cache_key, client);
+            
+            result
+        }).await.map_err(|e| AppError::Other(format!("Task join error: {}", e)))?;
+        
+        result
     }
     
     /// 重置 Consumer Group 的 Offset
