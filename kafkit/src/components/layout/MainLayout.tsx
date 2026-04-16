@@ -82,19 +82,6 @@ export function MainLayout() {
 
         {/* Navigation Icons */}
         <nav className="flex-1 py-3 space-y-2 overflow-y-auto">
-          {/* Dashboard */}
-          <button
-            onClick={() => handleNavClick('/main/dashboard')}
-            className={`w-full flex items-center justify-center py-3 transition-colors ${
-              isDashboardRoute
-                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-            title={t('nav.dashboard')}
-          >
-            <Activity className="w-5 h-5" />
-          </button>
-
           {/* Home */}
           <button
             onClick={() => handleNavClick('/main/topics')}
@@ -106,6 +93,19 @@ export function MainLayout() {
             title="Topic 管理"
           >
             <Home className="w-5 h-5" />
+          </button>
+
+          {/* Dashboard */}
+          <button
+            onClick={() => handleNavClick('/main/dashboard')}
+            className={`w-full flex items-center justify-center py-3 transition-colors ${
+              isDashboardRoute
+                ? 'text-primary bg-primary/10 border-r-2 border-r-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            title={t('nav.dashboard')}
+          >
+            <Activity className="w-5 h-5" />
           </button>
           
           {/* Groups */}

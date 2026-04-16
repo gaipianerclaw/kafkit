@@ -23,6 +23,11 @@ const COLORS = [
   '#f59e0b', // amber-500
   '#ef4444', // red-500
   '#8b5cf6', // violet-500
+  '#06b6d4', // cyan-500
+  '#f97316', // orange-500
+  '#ec4899', // pink-500
+  '#6366f1', // indigo-500
+  '#84cc16', // lime-500
 ];
 
 function getGroupColor(index: number): string {
@@ -76,7 +81,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
   const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
-  const topGroups = useMemo(() => {
+  const allGroups = useMemo(() => {
     const groupMaxLag = new Map<string, number>();
     data.forEach((point) => {
       const current = groupMaxLag.get(point.groupId) || 0;
@@ -85,7 +90,6 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
 
     return Array.from(groupMaxLag.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([groupId]) => groupId);
   }, [data]);
 
@@ -128,7 +132,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
       <ResponsiveContainer width="100%" height="85%" minHeight={160}>
         <LineChart
           data={chartData}
-          margin={{ top: 5, right: 16, bottom: 24, left: 0 }}
+          margin={{ top: 5, right: 16, bottom: 40, left: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
           <XAxis
@@ -149,7 +153,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
           <Legend
             verticalAlign="bottom"
             align="left"
-            height={24}
+            height={36}
             iconType="circle"
             wrapperStyle={{
               cursor: 'pointer',
@@ -158,7 +162,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
             }}
             onClick={(e) => handleLegendClick(e.value as string)}
           />
-          {topGroups.map((groupId, index) => (
+          {allGroups.map((groupId, index) => (
             <Line
               key={groupId}
               type="monotone"

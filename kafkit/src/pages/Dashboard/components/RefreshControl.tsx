@@ -1,7 +1,7 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Pause, Play } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { formatTimeAgo } from '../../../utils/formatters';
 
 interface RefreshControlProps {
   autoRefresh: boolean;
@@ -9,6 +9,25 @@ interface RefreshControlProps {
   lastUpdated: number;
   onManualRefresh: () => void;
   isLoading: boolean;
+}
+
+function useLocalizedTimeAgo(timestamp: number, t: (key: string, options?: Record<string, unknown>) => string) {
+  return useMemo(() => {
+    if (timestamp <= 0) return '';
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+    if (seconds < 5) return t('timeAgo.justNow');
+    if (seconds < 60) return t('timeAgo.secondsAgo', { count: seconds });
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t('timeAgo.minutesAgo', { count: minutes });
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t('timeAgo.hoursAgo', { count: hours });
+
+    const days = Math.floor(hours / 24);
+    return t('timeAgo.daysAgo', { count: days });
+  }, [timestamp, t]);
 }
 
 export function RefreshControl({
@@ -19,12 +38,13 @@ export function RefreshControl({
   isLoading,
 }: RefreshControlProps) {
   const { t } = useTranslation();
+  const timeAgo = useLocalizedTimeAgo(lastUpdated, t);
 
   return (
     <div className="flex items-center gap-3">
       {lastUpdated > 0 && (
         <span className="text-sm text-muted-foreground">
-          {t('dashboard.updated', { time: formatTimeAgo(lastUpdated) })}
+          {t('dashboard.updated', { time: timeAgo })}
         </span>
       )}
       
