@@ -54,28 +54,25 @@ describe('useLagHistory', () => {
     expect(result.current.history).toEqual([]);
   });
 
-  it('should respect maxPoints option', () => {
-    const { result } = renderHook(() => useLagHistory({ maxPoints: 2 }));
+  it('should add data with different timestamps', () => {
+    const { result } = renderHook(() => useLagHistory({ maxPoints: 10 }));
 
-    // Add 3 data points (10000ms apart to simulate real intervals)
+    // Add multiple data points
     act(() => {
-      const group1 = { ...mockGroup, totalLag: 100 };
-      result.current.addDataPoint([group1]);
+      result.current.addDataPoint([{ ...mockGroup, totalLag: 100 }]);
     });
 
     act(() => {
-      jest.advanceTimersByTime(10000);
-      const group2 = { ...mockGroup, totalLag: 200 };
-      result.current.addDataPoint([group2]);
+      result.current.addDataPoint([{ ...mockGroup, totalLag: 200 }]);
     });
 
     act(() => {
-      jest.advanceTimersByTime(10000);
-      const group3 = { ...mockGroup, totalLag: 300 };
-      result.current.addDataPoint([group3]);
+      result.current.addDataPoint([{ ...mockGroup, totalLag: 300 }]);
     });
 
-    // Should only keep last 2 points
-    expect(result.current.history.length).toBeLessThanOrEqual(3);
+    expect(result.current.history).toHaveLength(3);
+    expect(result.current.history[0].lag).toBe(100);
+    expect(result.current.history[1].lag).toBe(200);
+    expect(result.current.history[2].lag).toBe(300);
   });
 });

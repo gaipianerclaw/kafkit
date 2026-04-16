@@ -1,32 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { I18nextProvider } from 'react-i18next';
-import i18n from '../../../i18n';
 import { StatCards } from '../StatCards';
 import type { DashboardConsumerGroup } from '../../../types/dashboard';
 
-// Mock i18n
-i18n.init({
-  lng: 'zh-CN',
-  resources: {
-    'zh-CN': {
-      translation: {
-        dashboard: {
-          stats: {
-            totalGroups: '总消费组数',
-            healthStatus: '健康状态',
-            healthSubtitle: '健康/警告/危险',
-            totalLag: '总 Lag 数量',
-          },
-        },
-      },
+// Mock react-i18next
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'dashboard.stats.totalGroups': 'Total Groups',
+        'dashboard.stats.healthStatus': 'Health Status',
+        'dashboard.stats.healthSubtitle': 'Healthy/Warning/Critical',
+        'dashboard.stats.totalLag': 'Total Lag',
+      };
+      return translations[key] || key;
     },
-  },
-});
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
-);
+  }),
+}));
 
 describe('StatCards', () => {
   const mockGroups: DashboardConsumerGroup[] = [
@@ -63,44 +53,46 @@ describe('StatCards', () => {
   ];
 
   it('should render all three stat cards', () => {
-    render(<StatCards groups={mockGroups} isLoading={false} />, { wrapper: Wrapper });
+    render(<StatCards groups={mockGroups} isLoading={false} />);
 
-    expect(screen.getByText('总消费组数')).toBeInTheDocument();
-    expect(screen.getByText('健康状态')).toBeInTheDocument();
-    expect(screen.getByText('总 Lag 数量')).toBeInTheDocument();
+    expect(screen.getByText('Total Groups')).toBeInTheDocument();
+    expect(screen.getByText('Health Status')).toBeInTheDocument();
+    expect(screen.getByText('Total Lag')).toBeInTheDocument();
   });
 
   it('should display correct total groups count', () => {
-    render(<StatCards groups={mockGroups} isLoading={false} />, { wrapper: Wrapper });
+    render(<StatCards groups={mockGroups} isLoading={false} />);
 
     expect(screen.getByText('3')).toBeInTheDocument(); // Total groups
   });
 
   it('should display correct health distribution', () => {
-    render(<StatCards groups={mockGroups} isLoading={false} />, { wrapper: Wrapper });
+    render(<StatCards groups={mockGroups} isLoading={false} />);
 
     expect(screen.getByText('1/1/1')).toBeInTheDocument(); // healthy/warning/critical
   });
 
   it('should display correct total lag', () => {
-    render(<StatCards groups={mockGroups} isLoading={false} />, { wrapper: Wrapper });
+    render(<StatCards groups={mockGroups} isLoading={false} />);
 
     // 500 + 5000 + 15000 = 20500 = 20.5K
     expect(screen.getByText('20.5K')).toBeInTheDocument();
   });
 
   it('should show loading skeleton when isLoading is true', () => {
-    render(<StatCards groups={[]} isLoading={true} />, { wrapper: Wrapper });
+    render(<StatCards groups={[]} isLoading={true} />);
 
-    const skeletons = document.querySelectorAll('[data-slot="skeleton"]');
+    // Check for skeleton elements by class
+    const skeletons = document.querySelectorAll('.animate-pulse');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('should handle empty groups', () => {
-    render(<StatCards groups={[]} isLoading={false} />, { wrapper: Wrapper });
+    render(<StatCards groups={[]} isLoading={false} />);
 
-    expect(screen.getByText('0')).toBeInTheDocument();
+    // Total groups shows '0', total lag also shows '0'
+    const zeros = screen.getAllByText('0');
+    expect(zeros.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('0/0/0')).toBeInTheDocument();
-    expect(screen.getByText('0')).toBeInTheDocument();
   });
 });
