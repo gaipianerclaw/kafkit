@@ -488,7 +488,8 @@
       "members": "成员数",
       "topics": "Topics",
       "lag": "Lag",
-      "noResults": "无匹配结果"
+      "noResults": "无匹配结果",
+      "unknownStateHint": "Kafka 未返回该消费组的详细状态，通常是因为协调器信息不可用"
     },
     "filter": {
       "all": "全部状态"

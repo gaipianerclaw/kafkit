@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { 
-  ConsumerGroupInfo, 
-  PartitionLag 
-} from '../../../types';
-import type { 
-  DashboardConsumerGroup, 
-  LagDataPoint, 
+import type { ConsumerGroupInfo, PartitionLag } from '../../../types';
+import type {
+  DashboardConsumerGroup,
+  LagDataPoint,
   UseDashboardDataReturn,
-  HealthStatus 
+  HealthStatus,
 } from '../../../types/dashboard';
 
 const REFRESH_INTERVAL = 10000; // 10 seconds
@@ -48,9 +45,9 @@ export function useDashboardData(
     lastUpdated: 0,
   });
 
-  // Use ref to track mounted state
   const isMounted = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRefreshRef = useRef(autoRefresh);
 
   interface DashboardState {
     groups: DashboardConsumerGroup[];
@@ -60,23 +57,25 @@ export function useDashboardData(
     lastUpdated: number;
   }
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (trigger: 'init' | 'auto' | 'manual' = 'auto') => {
     if (!connectionId) {
       setState((prev) => ({ ...prev, isLoading: false }));
       return;
     }
 
-    try {
-      setState((prev) => ({ ...prev, isLoading: prev.groups.length === 0 }));
+    console.log(`[Dashboard] Fetch triggered by: ${trigger}`);
 
-      // 1. Fetch all consumer groups
-      console.log('[Dashboard] Fetching consumer groups for connection:', connectionId);
+    try {
+      // Only show loading spinner on initial load or manual refresh
+      const showLoading = trigger === 'init' || trigger === 'manual';
+      if (showLoading) {
+        setState((prev) => ({ ...prev, isLoading: true }));
+      }
+
       const groupList = await invoke<ConsumerGroupInfo[]>('list_consumer_groups', {
         connectionId,
       });
-      console.log('[Dashboard] Received groups:', groupList.length, groupList);
 
-      // 2. Fetch lag for each group (parallel)
       const groupsWithLag = await Promise.all(
         groupList.map(async (group) => {
           try {
@@ -84,11 +83,9 @@ export function useDashboardData(
               connectionId,
               groupId: group.groupId,
             });
-            console.log(`[Dashboard] Lag for ${group.groupId}:`, lagData.length, lagData);
             return enrichGroupData(group, lagData);
           } catch (err) {
             console.error(`[Dashboard] Failed to fetch lag for ${group.groupId}:`, err);
-            // Return group with zero lag on error
             return enrichGroupData(group, []);
           }
         })
@@ -96,7 +93,6 @@ export function useDashboardData(
 
       if (!isMounted.current) return;
 
-      // 3. Update trend data
       const timestamp = Date.now();
       const newDataPoints: LagDataPoint[] = groupsWithLag.map((g) => ({
         timestamp,
@@ -106,8 +102,7 @@ export function useDashboardData(
 
       setState((prev) => {
         const combined = [...prev.trendData, ...newDataPoints];
-        // Keep only last MAX_HISTORY_POINTS timestamps
-        const cutoff = timestamp - (MAX_HISTORY_POINTS * REFRESH_INTERVAL);
+        const cutoff = timestamp - MAX_HISTORY_POINTS * REFRESH_INTERVAL;
         const filtered = combined.filter((p) => p.timestamp > cutoff);
 
         return {
@@ -119,7 +114,7 @@ export function useDashboardData(
         };
       });
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
+      console.error('[Dashboard] Failed to fetch dashboard data:', err);
       if (isMounted.current) {
         setState((prev) => ({
           ...prev,
@@ -130,25 +125,42 @@ export function useDashboardData(
     }
   }, [connectionId]);
 
-  // Initial fetch and auto-refresh
+  // Sync autoRefresh ref
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh;
+  }, [autoRefresh]);
+
+  // Initial fetch on mount / connection change
   useEffect(() => {
     isMounted.current = true;
-    
-    fetchData();
-
-    if (autoRefresh) {
-      intervalRef.current = setInterval(fetchData, REFRESH_INTERVAL);
-    }
+    fetchData('init');
 
     return () => {
       isMounted.current = false;
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [fetchData, autoRefresh]);
+  }, [fetchData]);
 
-  // Visibility change handler (pause when hidden)
+  // Manage interval based on autoRefresh
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(() => {
+        fetchData('auto');
+      }, REFRESH_INTERVAL);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [autoRefresh, fetchData]);
+
+  // Visibility change handler
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
@@ -156,18 +168,22 @@ export function useDashboardData(
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
-      } else if (autoRefresh) {
-        fetchData();
-        intervalRef.current = setInterval(fetchData, REFRESH_INTERVAL);
+      } else if (autoRefreshRef.current) {
+        fetchData('auto');
+        intervalRef.current = setInterval(() => fetchData('auto'), REFRESH_INTERVAL);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [autoRefresh, fetchData]);
+  }, [fetchData]);
+
+  const refresh = useCallback(async () => {
+    await fetchData('manual');
+  }, [fetchData]);
 
   return {
     ...state,
-    refresh: fetchData,
+    refresh,
   };
 }

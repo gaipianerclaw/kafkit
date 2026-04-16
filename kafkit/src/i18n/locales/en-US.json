@@ -488,7 +488,8 @@
       "members": "Members",
       "topics": "Topics",
       "lag": "Lag",
-      "noResults": "No matching results"
+      "noResults": "No matching results",
+      "unknownStateHint": "Kafka did not return detailed state for this group, usually because coordinator info is unavailable"
     },
     "filter": {
       "all": "All Status"

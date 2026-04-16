@@ -194,7 +194,14 @@ export function ConsumerGroupTable({
                       />
                     </TableCell>
                     <TableCell className="font-medium">{group.groupId}</TableCell>
-                    <TableCell>{group.state}</TableCell>
+                    <TableCell>
+                      <span
+                        className="cursor-help border-b border-dotted border-muted-foreground/50"
+                        title={group.state === 'Unknown' ? t('dashboard.table.unknownStateHint') : undefined}
+                      >
+                        {group.state}
+                      </span>
+                    </TableCell>
                     <TableCell>{group.memberCount}</TableCell>
                     <TableCell>{group.topics.length}</TableCell>
                     <TableCell className="font-mono">{formatNumber(group.totalLag)}</TableCell>
