@@ -1041,13 +1041,17 @@ impl ConnectionManager {
     ) -> Result<Vec<PartitionLag>, AppError> {
         println!("[Kafkit] Getting consumer lag for group: {}", group_id);
         
-        // 克隆必要的数据用于 spawn_blocking
-        let client = self.get_client(connection).await?;
+        // 创建带 group.id 的配置（查询 committed offsets 必需）
+        let mut config = Self::create_client_config(connection)?;
+        config.set("group.id", group_id);
+        config.set("client.id", &format!("kafkit-lag-{}-{}", connection.id, group_id));
+        config.set("enable.auto.commit", "false");
+        
         let group_id = group_id.to_string();
         
         // 使用 spawn_blocking 包装同步代码，避免非 Send 类型跨越 await
         let result = tokio::task::spawn_blocking(move || {
-            Self::get_consumer_lag_sync(&client, &group_id)
+            Self::get_consumer_lag_sync(config, &group_id)
         }).await.map_err(|e| AppError::Other(format!("Task join error: {}", e)))?;
         
         result
@@ -1055,34 +1059,22 @@ impl ConnectionManager {
     
     /// 同步版本的获取 Consumer Lag（用于 spawn_blocking 内部）
     fn get_consumer_lag_sync(
-        client: &BaseConsumer,
+        config: ClientConfig,
         group_id: &str,
     ) -> Result<Vec<PartitionLag>, AppError> {
         let mut result = Vec::new();
         let mut processed_partitions = std::collections::HashSet::new();
         
-        // 首先检查消费组是否存在 - 增加超时时间
-        let groups = match client.fetch_group_list(Some(group_id), Duration::from_secs(10)) {
-            Ok(g) => g,
+        // 创建带 group.id 的 consumer（查询 committed offsets 必需）
+        let client: BaseConsumer = match config.create() {
+            Ok(c) => c,
             Err(e) => {
-                let error_msg = format!("{}", e);
-                if error_msg.contains("UnknownGroup") || error_msg.contains("unknown group") {
-                    println!("[Kafkit] Consumer group '{}' not found or expired", group_id);
-                    log::warn!("Consumer group '{}' not found or expired", group_id);
-                    return Ok(vec![]);
-                }
-                let err_msg = format!("Failed to fetch consumer group info for {}: {}", group_id, e);
+                let err_msg = format!("Failed to create lag query client for {}: {}", group_id, e);
                 println!("[Kafkit] {}", err_msg);
                 log::error!("{}", err_msg);
                 return Err(AppError::KafkaError(err_msg));
             }
         };
-        
-        // 检查消费组是否存在（仅用于日志，不提前返回）
-        let group_exists = groups.groups().iter().any(|g| g.name() == group_id);
-        if !group_exists {
-            println!("[Kafkit] Consumer group '{}' not in group list, trying direct committed query", group_id);
-        }
         
         // 获取集群元数据
         let metadata = match client.fetch_metadata(None, Duration::from_secs(10)) {
@@ -1112,7 +1104,7 @@ impl ConnectionManager {
                 }
                 
                 // 获取 committed offsets，带重试逻辑
-                let committed = match Self::fetch_committed_with_retry_sync(client, &tpl, 3) {
+                let committed = match Self::fetch_committed_with_retry_sync(&client, &tpl, 3) {
                     Ok(c) => c,
                     Err(e) => {
                         let error_msg = format!("{}", e);
