@@ -1,146 +1,99 @@
 import { describe, it, expect } from 'vitest';
+import { formatNumber, formatNumberExact, formatTime, formatTimeAgo, formatDuration } from '../formatters';
 
-/**
- * Format bytes to human readable string
- */
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Format offset number with locale
- */
-export function formatOffset(offset: number): string {
-  return offset.toLocaleString();
-}
-
-/**
- * Validate Kafka topic name
- */
-export function isValidTopicName(name: string): boolean {
-  if (!name || name.length === 0 || name.length > 249) return false;
-  if (name === '.' || name === '..') return false;
-  // Valid characters: alphanumeric, ., _, -
-  return /^[a-zA-Z0-9._-]+$/.test(name);
-}
-
-/**
- * Parse bootstrap servers string to array
- */
-export function parseBootstrapServers(servers: string): string[] {
-  return servers.split(',').map(s => s.trim()).filter(s => s.length > 0);
-}
-
-/**
- * Format timestamp to locale string
- */
-export function formatTimestamp(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
-}
-
-/**
- * Truncate string with ellipsis
- */
-export function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength - 3) + '...';
-}
-
-describe('Formatter Utilities', () => {
-  describe('formatBytes', () => {
-    it('formats 0 bytes', () => {
-      expect(formatBytes(0)).toBe('0 B');
-    });
-
-    it('formats bytes to KB', () => {
-      expect(formatBytes(1024)).toBe('1 KB');
-      expect(formatBytes(1536)).toBe('1.5 KB');
-    });
-
-    it('formats bytes to MB', () => {
-      expect(formatBytes(1024 * 1024)).toBe('1 MB');
-    });
-
-    it('formats bytes to GB', () => {
-      expect(formatBytes(1024 * 1024 * 1024)).toBe('1 GB');
-    });
+describe('formatNumber', () => {
+  it('should format small numbers correctly', () => {
+    expect(formatNumber(0)).toBe('0');
+    expect(formatNumber(100)).toBe('100');
+    expect(formatNumber(999)).toBe('999');
   });
 
-  describe('formatOffset', () => {
-    it('formats small numbers', () => {
-      expect(formatOffset(100)).toBe('100');
-    });
-
-    it('formats large numbers with locale', () => {
-      expect(formatOffset(1000000)).toContain('000');
-    });
+  it('should format thousands with K suffix', () => {
+    expect(formatNumber(1000)).toBe('1.0K');
+    expect(formatNumber(1500)).toBe('1.5K');
+    expect(formatNumber(999999)).toBe('1000.0K');
   });
 
-  describe('isValidTopicName', () => {
-    it('accepts valid names', () => {
-      expect(isValidTopicName('test-topic')).toBe(true);
-      expect(isValidTopicName('test_topic')).toBe(true);
-      expect(isValidTopicName('test.topic')).toBe(true);
-      expect(isValidTopicName('TestTopic123')).toBe(true);
-    });
-
-    it('rejects invalid names', () => {
-      expect(isValidTopicName('')).toBe(false);
-      expect(isValidTopicName('.')).toBe(false);
-      expect(isValidTopicName('..')).toBe(false);
-      expect(isValidTopicName('test topic')).toBe(false);
-      expect(isValidTopicName('test@topic')).toBe(false);
-    });
-
-    it('rejects names that are too long', () => {
-      expect(isValidTopicName('a'.repeat(250))).toBe(false);
-    });
+  it('should format millions with M suffix', () => {
+    expect(formatNumber(1000000)).toBe('1.0M');
+    expect(formatNumber(1500000)).toBe('1.5M');
+    expect(formatNumber(999999999)).toBe('1000.0M');
   });
 
-  describe('parseBootstrapServers', () => {
-    it('parses single server', () => {
-      expect(parseBootstrapServers('localhost:9092')).toEqual(['localhost:9092']);
-    });
-
-    it('parses multiple servers', () => {
-      const result = parseBootstrapServers('host1:9092,host2:9092');
-      expect(result).toEqual(['host1:9092', 'host2:9092']);
-    });
-
-    it('handles whitespace', () => {
-      const result = parseBootstrapServers(' host1:9092 , host2:9092 ');
-      expect(result).toEqual(['host1:9092', 'host2:9092']);
-    });
-
-    it('filters empty strings', () => {
-      expect(parseBootstrapServers('host1:9092,,host2:9092')).toEqual(['host1:9092', 'host2:9092']);
-    });
+  it('should format billions with B suffix', () => {
+    expect(formatNumber(1000000000)).toBe('1.0B');
+    expect(formatNumber(2500000000)).toBe('2.5B');
   });
 
-  describe('formatTimestamp', () => {
-    it('formats valid timestamp', () => {
-      const timestamp = Date.now();
-      const result = formatTimestamp(timestamp);
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
-    });
+  it('should handle negative numbers', () => {
+    expect(formatNumber(-1000)).toBe('-1.0K');
+    expect(formatNumber(-1500000)).toBe('-1.5M');
+  });
+});
+
+describe('formatNumberExact', () => {
+  it('should format numbers with locale separators', () => {
+    expect(formatNumberExact(1000)).toBe('1,000');
+    expect(formatNumberExact(1000000)).toBe('1,000,000');
+    expect(formatNumberExact(1234567)).toBe('1,234,567');
+  });
+});
+
+describe('formatTime', () => {
+  it('should format timestamp to time string', () => {
+    const timestamp = new Date('2024-01-15T14:30:45').getTime();
+    const result = formatTime(timestamp);
+    expect(result).toMatch(/14:30:45/);
+  });
+});
+
+describe('formatTimeAgo', () => {
+  it('should return "just now" for recent timestamps', () => {
+    const now = Date.now();
+    expect(formatTimeAgo(now)).toBe('just now');
+    expect(formatTimeAgo(now - 3000)).toBe('just now');
   });
 
-  describe('truncate', () => {
-    it('returns original string if short enough', () => {
-      expect(truncate('hello', 10)).toBe('hello');
-    });
+  it('should return seconds for timestamps within a minute', () => {
+    const now = Date.now();
+    expect(formatTimeAgo(now - 10000)).toBe('10s ago');
+    expect(formatTimeAgo(now - 45000)).toBe('45s ago');
+  });
 
-    it('truncates long string', () => {
-      expect(truncate('hello world', 8)).toBe('hello...');
-    });
+  it('should return minutes for timestamps within an hour', () => {
+    const now = Date.now();
+    expect(formatTimeAgo(now - 120000)).toBe('2m ago');
+    expect(formatTimeAgo(now - 3540000)).toBe('59m ago');
+  });
 
-    it('handles exact length', () => {
-      expect(truncate('hello', 5)).toBe('hello');
-    });
+  it('should return hours for timestamps within a day', () => {
+    const now = Date.now();
+    expect(formatTimeAgo(now - 7200000)).toBe('2h ago');
+    expect(formatTimeAgo(now - 82800000)).toBe('23h ago');
+  });
+
+  it('should return days for older timestamps', () => {
+    const now = Date.now();
+    expect(formatTimeAgo(now - 86400000)).toBe('1d ago');
+    expect(formatTimeAgo(now - 172800000)).toBe('2d ago');
+  });
+});
+
+describe('formatDuration', () => {
+  it('should format seconds', () => {
+    expect(formatDuration(5000)).toBe('5s');
+    expect(formatDuration(59000)).toBe('59s');
+  });
+
+  it('should format minutes and seconds', () => {
+    expect(formatDuration(60000)).toBe('1m 0s');
+    expect(formatDuration(90000)).toBe('1m 30s');
+    expect(formatDuration(3540000)).toBe('59m 0s');
+  });
+
+  it('should format hours and minutes', () => {
+    expect(formatDuration(3600000)).toBe('1h 0m');
+    expect(formatDuration(5400000)).toBe('1h 30m');
+    expect(formatDuration(7200000)).toBe('2h 0m');
   });
 });

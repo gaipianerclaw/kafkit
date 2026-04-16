@@ -2,7 +2,7 @@
 
 跨平台 Kafka 桌面客户端，支持 macOS、Linux 和 Windows。
 
-![Version](https://img.shields.io/badge/version-1.0.5-blue)
+![Version](https://img.shields.io/badge/version-1.0.6-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能特性
@@ -49,23 +49,26 @@
 |------|----------|
 | macOS | 11.0+ (Big Sur) |
 | Linux | Ubuntu 20.04+ / Fedora 35+ |
-| Windows | Windows 10 1809+ / Windows 11 |
+| Windows | Windows 10 1809+ / Windows 11 (需要 WebView2 Runtime) |
 
 ## 下载安装
 
 从 [GitHub Releases](https://github.com/gaipianerclaw/kafkit/releases) 下载最新版本。
 
 ### macOS
-- `Kafkit_1.0.5_aarch64.dmg` (Apple Silicon)
-- `Kafkit_1.0.5_x64.dmg` (Intel)
+- `Kafkit_1.0.6_aarch64.dmg` (Apple Silicon)
+- `Kafkit_1.0.6_x64.dmg` (Intel)
 
 ### Linux
-- `kafkit_1.0.5_amd64.deb` (Ubuntu/Debian)
-- `kafkit-1.0.5-1.x86_64.rpm` (Fedora/RHEL)
+- `kafkit_1.0.6_amd64.deb` (Ubuntu/Debian)
+- `kafkit-1.0.6-1.x86_64.rpm` (Fedora/RHEL)
 
 ### Windows
-- `Kafkit_1.0.5_x64-setup.exe`
-- `Kafkit_1.0.5_x64.msi`
+
+**前置要求**: [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (Windows 11 通常已预装)
+
+- `Kafkit_1.0.6_x64-setup.exe`
+- `Kafkit_1.0.6_x64.msi`
 
 ## 快速开始
 
@@ -74,6 +77,7 @@
 3. **发送消息**: 在 Topic 详情页点击"发送消息"
 4. **消费消息**: 在 Topic 详情页点击"消费消息"
 5. **查看消费组**: 点击左侧"消费组"
+6. **监控仪表盘**: 点击左侧"监控仪表盘"查看实时 Lag 监控
 
 详细使用说明请参考 [USER_GUIDE.md](./USER_GUIDE.md)
 
