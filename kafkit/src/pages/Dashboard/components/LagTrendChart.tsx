@@ -158,7 +158,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
             wrapperStyle={{
               cursor: 'pointer',
               fontSize: '11px',
-              paddingBottom: '8px',
+              paddingBottom: '16px',
             }}
             onClick={(e) => handleLegendClick(e.value as string)}
           />
