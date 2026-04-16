@@ -152,7 +152,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
           <Tooltip content={<CustomTooltip />} />
           <Legend
             verticalAlign="top"
-            align="center"
+            align="left"
             height={36}
             iconType="circle"
             wrapperStyle={{
