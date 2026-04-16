@@ -84,9 +84,10 @@ export function useDashboardData(
               connectionId,
               groupId: group.groupId,
             });
+            console.log(`[Dashboard] Lag for ${group.groupId}:`, lagData.length, lagData);
             return enrichGroupData(group, lagData);
           } catch (err) {
-            console.error(`Failed to fetch lag for ${group.groupId}:`, err);
+            console.error(`[Dashboard] Failed to fetch lag for ${group.groupId}:`, err);
             // Return group with zero lag on error
             return enrichGroupData(group, []);
           }

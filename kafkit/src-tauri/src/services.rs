@@ -1078,11 +1078,10 @@ impl ConnectionManager {
             }
         };
         
-        // 检查消费组是否存在
+        // 检查消费组是否存在（仅用于日志，不提前返回）
         let group_exists = groups.groups().iter().any(|g| g.name() == group_id);
         if !group_exists {
-            println!("[Kafkit] Consumer group '{}' does not exist", group_id);
-            return Ok(vec![]);
+            println!("[Kafkit] Consumer group '{}' not in group list, trying direct committed query", group_id);
         }
         
         // 获取集群元数据
@@ -1143,20 +1142,18 @@ impl ConnectionManager {
                     // 获取 log end offset
                     match client.fetch_watermarks(topic_name, partition, Duration::from_secs(5)) {
                         Ok((_, high)) => {
-                            let current_offset = match offset {
-                                rdkafka::Offset::Offset(o) => o,
-                                rdkafka::Offset::End => high,
-                                rdkafka::Offset::Beginning => 0,
+                            let (current_offset, lag) = match offset {
+                                rdkafka::Offset::Offset(o) => (o, high.saturating_sub(o)),
+                                rdkafka::Offset::End => (high, 0),
+                                rdkafka::Offset::Beginning => (0, high),
+                                rdkafka::Offset::Invalid => {
+                                    // 消费组没有在此分区提交过 offset，跳过
+                                    continue;
+                                }
                                 _ => {
                                     println!("[Kafkit] Unusual offset state for {}-{}: {:?}", topic_name, partition, offset);
-                                    -1
+                                    (-1, high)
                                 }
-                            };
-                            
-                            let lag = if current_offset >= 0 {
-                                high.saturating_sub(current_offset)
-                            } else {
-                                high
                             };
                             
                             result.push(PartitionLag {
