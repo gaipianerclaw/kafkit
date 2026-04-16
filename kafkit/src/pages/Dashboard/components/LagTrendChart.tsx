@@ -132,7 +132,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
       <ResponsiveContainer width="100%" height="85%" minHeight={160}>
         <LineChart
           data={chartData}
-          margin={{ top: 5, right: 16, bottom: 40, left: 0 }}
+          margin={{ top: 36, right: 16, bottom: 24, left: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
           <XAxis
@@ -151,14 +151,14 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend
-            verticalAlign="bottom"
-            align="left"
+            verticalAlign="top"
+            align="center"
             height={36}
             iconType="circle"
             wrapperStyle={{
               cursor: 'pointer',
               fontSize: '11px',
-              paddingTop: '8px',
+              paddingBottom: '8px',
             }}
             onClick={(e) => handleLegendClick(e.value as string)}
           />
