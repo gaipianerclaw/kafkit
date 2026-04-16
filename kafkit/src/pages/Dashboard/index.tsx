@@ -79,7 +79,7 @@ export function DashboardPage() {
       <StatCards groups={groups} isLoading={isLoading} />
 
       {/* Trend Chart */}
-      <div className="shrink-0 h-80">
+      <div className="shrink-0 h-56">
         <LagTrendChart data={trendData} />
       </div>
 

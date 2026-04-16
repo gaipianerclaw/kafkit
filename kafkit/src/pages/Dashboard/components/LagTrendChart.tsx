@@ -126,7 +126,7 @@ export function LagTrendChart({ data }: LagTrendChartProps) {
       <div className="flex items-start justify-between gap-4 mb-3">
         <h3 className="text-sm font-medium shrink-0">{t('dashboard.chart.title')}</h3>
         {/* Custom legend */}
-        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1.5 flex-1">
+        <div className="flex flex-wrap justify-start gap-x-3 gap-y-1.5 flex-1">
           {allGroups.map((groupId, index) => {
             const isHidden = hiddenGroups.has(groupId);
             return (
